@@ -1,3 +1,4 @@
+// src/widgets/sidebar/ui/SidebarSection.tsx
 import React from 'react'
 import { SidebarItem } from './SidebarItem'
 
@@ -11,6 +12,8 @@ interface SidebarSectionProps {
     items: SidebarItemType[]
     activeItem: string
     onItemClick: (itemText: string) => void
+    showDelete?: boolean
+    onCloseLanguage?: () => void
 }
 
 export const SidebarSection: React.FC<SidebarSectionProps> = ({
@@ -18,6 +21,8 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
     items,
     activeItem,
     onItemClick,
+    showDelete = false,
+    onCloseLanguage = () => {},
 }) => {
     return (
         <div className='sidebar-section'>
@@ -29,10 +34,8 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                         text={item.text}
                         isActive={activeItem === item.text}
                         onClick={() => onItemClick(item.text)}
-                        showDelete={
-                            activeItem === item.text &&
-                            item.text !== 'Create Chatbot GPT...'
-                        }
+                        showDelete={showDelete && activeItem === item.text}
+                        onDelete={onCloseLanguage}
                     />
                 ))}
             </ul>

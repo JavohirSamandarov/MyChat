@@ -1,63 +1,67 @@
-import React, { useState } from 'react'
+// src/widgets/sidebar/ui/Sidebar.tsx
+import React from 'react'
 import { SidebarSection } from './SidebarSection'
 import './Sidebar.css'
 
-interface SidebarItem {
-    id: string
-    text: string
+interface SidebarProps {
+    activeItem?: string
+    onItemClick?: (itemText: string) => void
+    onEditorClick?: () => void
+    onCloseLanguage?: () => void
 }
 
-export const Sidebar: React.FC = () => {
-    const [activeItem, setActiveItem] = useState<string>(
-        'Create Chatbot GPT...'
-    )
-
-    const conversationItems: SidebarItem[] = [
-        { id: '1', text: 'Clear All' },
-        { id: '2', text: 'Create Host Game Environment...' },
-        { id: '3', text: 'Apply To Leave For Emergency' },
-        { id: '4', text: 'What Is UI UX Design?' },
-        { id: '5', text: 'Create POS System' },
-        { id: '6', text: 'What is UX Audit?' },
-        { id: '7', text: 'Create Chatbot GPT...' },
-        { id: '8', text: 'How Chat GPT Work?' },
+export const Sidebar: React.FC<SidebarProps> = ({
+    activeItem = '',
+    onItemClick = () => {},
+    onEditorClick = () => {},
+    onCloseLanguage = () => {},
+}) => {
+    const conversationItems = [
+        { id: '1', text: 'Uzbek tili' },
+        { id: '2', text: 'Rus tili' },
     ]
 
-    const last7DaysItems: SidebarItem[] = [
-        { id: '9', text: 'Crypts Landing App Name' },
-        { id: '10', text: 'Operator Grammar Types' },
-        { id: '11', text: 'Min Scores For Binary DFA' },
-    ]
-
-    const settingsItems: SidebarItem[] = [{ id: '12', text: 'Andrew Neilson' }]
+    // const last7DaysItems = [
+    //     { id: '9', text: 'Crypto Lending App Name' },
+    //     { id: '10', text: 'Operator Grammar Types' },
+    // ]
 
     return (
         <div className='sidebar'>
             <div className='sidebar-header'>
-                <h2 className='sidebar-title'>CHAT A.1+</h2>
+                <h2 className='sidebar-title'>CHAT A.I+</h2>
+                <button className='new-chat-button' onClick={onEditorClick}>
+                    Editor
+                </button>
             </div>
 
             <div className='sidebar-content'>
                 <SidebarSection
-                    title='Your conversation'
+                    title='Tillar'
                     items={conversationItems}
                     activeItem={activeItem}
-                    onItemClick={setActiveItem}
+                    onItemClick={onItemClick}
+                    showDelete={!!activeItem}
+                    onCloseLanguage={onCloseLanguage}
                 />
 
-                <SidebarSection
+                {/* <SidebarSection
                     title='Last 7 Days'
                     items={last7DaysItems}
                     activeItem={activeItem}
-                    onItemClick={setActiveItem}
-                />
+                    onItemClick={onItemClick}
+                    showDelete={!!activeItem}
+                    onCloseLanguage={onCloseLanguage}
+                /> */}
+            </div>
 
-                <SidebarSection
-                    title='Settings'
-                    items={settingsItems}
-                    activeItem={activeItem}
-                    onItemClick={setActiveItem}
-                />
+            <div className='sidebar-footer'>
+                <div className='profile-section'>
+                    <div className='profile-avatar'>AN</div>
+                    <div className='profile-info'>
+                        <div className='profile-name'>Andrew Neilson</div>
+                    </div>
+                </div>
             </div>
         </div>
     )

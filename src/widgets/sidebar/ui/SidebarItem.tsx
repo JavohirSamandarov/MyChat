@@ -1,3 +1,4 @@
+// src/widgets/sidebar/ui/SidebarItem.tsx
 import React from 'react'
 
 interface SidebarItemProps {
@@ -5,6 +6,7 @@ interface SidebarItemProps {
     isActive: boolean
     onClick: () => void
     showDelete: boolean
+    onDelete?: () => void
 }
 
 export const SidebarItem: React.FC<SidebarItemProps> = ({
@@ -12,7 +14,13 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
     isActive,
     onClick,
     showDelete,
+    onDelete = () => {},
 }) => {
+    const handleDeleteClick = (e: React.MouseEvent) => {
+        e.stopPropagation() // Item bosilishini oldini olish
+        onDelete()
+    }
+
     return (
         <li
             className={`sidebar-item ${isActive ? 'active' : ''}`}
@@ -20,7 +28,10 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
         >
             <span className='sidebar-item-text'>{text}</span>
             {showDelete && (
-                <button className='sidebar-item-delete'>
+                <button
+                    className='sidebar-item-delete'
+                    onClick={handleDeleteClick}
+                >
                     <svg
                         width='16'
                         height='16'

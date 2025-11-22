@@ -11,7 +11,7 @@ export const Topbar: React.FC<TopbarProps> = ({
     activeTab = 0,
     onTabChange = () => {},
 }) => {
-    const tabs = ['Tab 1', 'Tab 2', 'Tab 3', 'Tab 4']
+    const tabs = ['Morfologik thalil', 'Sintaksis tahlil']
 
     return (
         <div className='topbar'>

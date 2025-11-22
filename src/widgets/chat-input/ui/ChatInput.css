@@ -1,6 +1,6 @@
 .chat-input-container {
     width: 100%;
-    max-width: 600px;
+    max-width: 900px;
     margin: 0 auto;
 }
 
@@ -10,12 +10,13 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: white;
     z-index: 1000;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 40px;
+    background: transparent;
+    backdrop-filter: blur(18px);
 }
 
 .chat-input-wrapper {
@@ -24,6 +25,7 @@
 }
 
 .chat-input {
+    color: #56637e;
     width: 100%;
     padding: 16px 60px 16px 20px;
     border: 2px solid #e9ecef;
@@ -33,14 +35,24 @@
     resize: vertical;
     outline: none;
     transition: all 0.3s ease;
-    background-color: #ffffff;
-    min-height: 120px;
-    max-height: 400px;
+    min-height: 300px;
+    /* max-height: 400px; */
+    background: radial-gradient(
+        circle,
+        rgba(255, 255, 255, 0.4) 0%,
+        rgba(255, 255, 255, 0.3) 100%
+    );
+
+    backdrop-filter: blur(18px);
 }
 
 .chat-input:focus {
-    border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    border-color: #fff;
+    opacity: 0.8;
+}
+.chat-input-container.fullscreen .chat-input:focus {
+    border-color: #fff;
+    opacity: 1;
 }
 
 .chat-input-container.fullscreen .chat-input {
@@ -48,6 +60,8 @@
     max-height: 80vh;
     font-size: 18px;
     padding: 24px 80px 24px 24px;
+    border-width: 3px;
+    background: rgba(255, 255, 255, 0.9);
     border-width: 3px;
 }
 
@@ -69,8 +83,8 @@
     background-color: #007bff;
     border: none;
     border-radius: 8px;
-    width: 40px;
-    height: 40px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -93,21 +107,20 @@
 
 .fullscreen-button {
     background: none;
-    border: 1px solid #e9ecef;
+    border: 1px solid #fff;
     border-radius: 8px;
-    width: 40px;
-    height: 40px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: #666;
+    color: #456288;
     transition: all 0.2s ease;
     flex-shrink: 0;
 }
 
 .fullscreen-button:hover {
-    background-color: #f8f9fa;
     border-color: #007bff;
     color: #007bff;
 }
