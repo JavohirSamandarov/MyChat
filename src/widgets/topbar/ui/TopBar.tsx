@@ -1,6 +1,6 @@
 import React from 'react'
 import { TabButton } from './TabButton'
-import './Topbar.css'
+import './TopBar.css'
 
 interface TopbarProps {
     activeTab?: number
