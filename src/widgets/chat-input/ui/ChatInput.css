@@ -79,12 +79,13 @@
     bottom: 24px;
 }
 
-.send-button {
+.save-button {
     background-color: #007bff;
     border: none;
     border-radius: 8px;
-    width: 24px;
-    height: 24px;
+    /* width: 24px;
+    height: 24px; */
+    padding: 4.5px 20px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -94,12 +95,12 @@
     flex-shrink: 0;
 }
 
-.send-button:hover:not(:disabled) {
+.save-button:hover:not(:disabled) {
     background-color: #0056b3;
-    transform: scale(1.05);
+    /* transform: scale(1.05); */
 }
 
-.send-button:disabled {
+.save-button:disabled {
     background-color: #6c757d;
     cursor: not-allowed;
     transform: none;

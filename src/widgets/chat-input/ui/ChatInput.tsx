@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
 import './ChatInput.css'
-import SendIcon from '@mui/icons-material/Send'
 import FullscreenIcon from '@mui/icons-material/Fullscreen'
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit'
 
@@ -78,14 +77,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 />
                 <div className='chat-input-actions'>
                     <button
-                        className='send-button'
+                        className='save-button'
                         onClick={handleSend}
                         disabled={!inputValue.trim()}
                     >
-                        <SendIcon
-                            fontSize='small'
-                            sx={{ fontSize: '14px !important' }}
-                        />
+                        Save
                     </button>
                     <button
                         className='fullscreen-button'

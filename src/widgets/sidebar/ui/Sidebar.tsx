@@ -1,4 +1,3 @@
-// src/widgets/sidebar/ui/Sidebar.tsx
 import React from 'react'
 import { SidebarSection } from './SidebarSection'
 import './Sidebar.css'
@@ -8,6 +7,8 @@ interface SidebarProps {
     onItemClick?: (itemText: string) => void
     onEditorClick?: () => void
     onCloseLanguage?: () => void
+    languageItems?: Array<{ id: string; text: string }>
+    activeTab?: number
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -15,21 +16,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onItemClick = () => {},
     onEditorClick = () => {},
     onCloseLanguage = () => {},
+    languageItems = [],
+    activeTab = 0,
 }) => {
-    const conversationItems = [
-        { id: '1', text: 'Uzbek tili' },
-        { id: '2', text: 'Rus tili' },
-    ]
-
     // const last7DaysItems = [
-    //     { id: '9', text: 'Crypto Lending App Name' },
-    //     { id: '10', text: 'Operator Grammar Types' },
+    //     // { id: '9', text: 'Crypto Lending App Name' },
+    //     // { id: '10', text: 'Operator Grammar Types' },
     // ]
+
+    const sectionTitle =
+        activeTab === 0 ? 'Morfologik tahlil' : 'Sintaksis tahlil'
 
     return (
         <div className='sidebar'>
             <div className='sidebar-header'>
-                <h2 className='sidebar-title'>CHAT A.I+</h2>
+                <h2 className='sidebar-title'>Annotation Tool</h2>
                 <button className='new-chat-button' onClick={onEditorClick}>
                     Editor
                 </button>
@@ -37,8 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             <div className='sidebar-content'>
                 <SidebarSection
-                    title='Tillar'
-                    items={conversationItems}
+                    title={sectionTitle}
+                    items={languageItems}
                     activeItem={activeItem}
                     onItemClick={onItemClick}
                     showDelete={!!activeItem}
