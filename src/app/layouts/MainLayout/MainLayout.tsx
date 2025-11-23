@@ -222,7 +222,178 @@ const MainLayout: React.FC = () => {
             case 'Uzbek tili':
                 return (
                     <div className='language-content english-content'>
-                        <h2>Universal POS tags Uz</h2>
+                        <h2>Teg (belgilash) nomi – Ma’nosi</h2>
+                        <p>
+                            Ushbu sintaktik teglar gap bo‘laklarining grammatik
+                            vazifalarini belgilash uchun qo‘llanadi. Har bir teg
+                            gapdagi ma’nodosh birlikning sintaktik rolini
+                            ko‘rsatadi.
+                        </p>
+
+                        <div className='pos-table-container'>
+                            <table className='pos-table'>
+                                <thead>
+                                    <tr>
+                                        <th>Asosiy bo‘laklar</th>
+                                        <th>Ikkinchi darajali bo‘laklar</th>
+                                        <th>Qo‘shimcha bo‘laklar</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>
+                                            <strong>EG</strong>
+                                        </td>
+                                        <td>
+                                            <strong>QA</strong>
+                                        </td>
+                                        <td>
+                                            <strong>UN</strong>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <strong>OK</strong>
+                                        </td>
+                                        <td>
+                                            <strong>SA</strong>
+                                        </td>
+                                        <td>
+                                            <strong>KR</strong>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>
+                                            <strong>FK</strong>
+                                        </td>
+                                        <td>
+                                            <strong>IA</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>
+                                            <strong>VL</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>
+                                            <strong>VS</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>
+                                            <strong>VH</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>
+                                            <strong>OH</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>
+                                            <strong>PH</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>
+                                            <strong>SH</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>
+                                            <strong>MH</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>
+                                            <strong>DH</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td></td>
+                                        <td>
+                                            <strong>SAH</strong>
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className='alphabetical-listing'>
+                            <h3>Alifbo tartibida ro‘yxat</h3>
+                            <ul>
+                                <li>
+                                    <strong>DH</strong>: daraja-miqdor holi
+                                </li>
+                                <li>
+                                    <strong>EG</strong>: ega
+                                </li>
+                                <li>
+                                    <strong>FK</strong>: fe’l kesim
+                                </li>
+                                <li>
+                                    <strong>IA</strong>: izohlovchi aniqlovchi
+                                </li>
+                                <li>
+                                    <strong>KR</strong>: kiritma
+                                </li>
+                                <li>
+                                    <strong>MH</strong>: maqsad holi
+                                </li>
+                                <li>
+                                    <strong>OH</strong>: o‘rin holi
+                                </li>
+                                <li>
+                                    <strong>OK</strong>: ot kesim
+                                </li>
+                                <li>
+                                    <strong>PH</strong>: payt holi
+                                </li>
+                                <li>
+                                    <strong>QA</strong>: qaratqich aniqlovchi
+                                </li>
+                                <li>
+                                    <strong>SA</strong>: sifatlovchi aniqlovchi
+                                </li>
+                                <li>
+                                    <strong>SAH</strong>: sabab holi
+                                </li>
+                                <li>
+                                    <strong>SH</strong>: shart holi
+                                </li>
+                                <li>
+                                    <strong>UN</strong>: undalma
+                                </li>
+                                <li>
+                                    <strong>VL</strong>: vositali to‘ldiruvchi
+                                </li>
+                                <li>
+                                    <strong>VH</strong>: vaziyat holi
+                                </li>
+                                <li>
+                                    <strong>VS</strong>: vositasiz to‘ldiruvchi
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 )
             default:
