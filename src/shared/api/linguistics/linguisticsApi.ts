@@ -1,7 +1,40 @@
 import ApiClient from '../base/apiClient'
 import { API_BASE_URL } from '../base/endpoints'
 
+export interface Language {
+    id: number
+    name: string
+    abbreviation: string
+    description: string
+    created_at: string
+    updated_at: string
+}
+
 export interface Tag {
+    language: Language
+    name_tag: string
+    abbreviation: string
+    description: string | null
+    color: string
+}
+
+export interface LinguisticsData {
+    id: number
+    name: string
+    description: string
+    languages: Language[]
+    tags: Tag[]
+}
+
+// API response strukturasi
+export interface LinguisticsResponse {
+    count: number
+    next: string | null
+    previous: string | null
+    results: LinguisticsData[]
+}
+
+export interface SimpleTag {
     id: number
     name: string
     description?: string
@@ -16,12 +49,6 @@ export interface TaggedText {
     updated_at: string
 }
 
-export interface LinguisticsData {
-    id: number
-    name: string
-    description: string
-}
-
 class LinguisticsApi {
     private client: ApiClient
 
@@ -29,37 +56,40 @@ class LinguisticsApi {
         this.client = new ApiClient(API_BASE_URL)
     }
 
-    // Linguistics
+    // Linguistics - yangi struktur
     async getLinguistics(): Promise<LinguisticsData[]> {
-        return this.client.get<LinguisticsData[]>('/api/linguistics/')
+        const response = await this.client.get<LinguisticsResponse>(
+            '/linguistics/'
+        )
+        return response.results // Faqat results qismini qaytaramiz
     }
 
     async getLinguisticsById(id: number): Promise<LinguisticsData> {
-        return this.client.get<LinguisticsData>(`/api/linguistics/${id}/`)
+        return this.client.get<LinguisticsData>(`/linguistics/${id}/`)
     }
 
-    // Tags
-    async getTags(): Promise<Tag[]> {
-        return this.client.get<Tag[]>('/api/tags/')
+    // Tags - eski struktur (agar kerak bo'lsa)
+    async getTags(): Promise<SimpleTag[]> {
+        return this.client.get<SimpleTag[]>('/tags/')
     }
 
-    async getTagById(id: number): Promise<Tag> {
-        return this.client.get<Tag>(`/api/tags/${id}/`)
+    async getTagById(id: number): Promise<SimpleTag> {
+        return this.client.get<SimpleTag>(`/tags/${id}/`)
     }
 
     // Tagged Texts
     async getTaggedTexts(): Promise<TaggedText[]> {
-        return this.client.get<TaggedText[]>('/api/tagged_texts/')
+        return this.client.get<TaggedText[]>('/tagged_texts/')
     }
 
     async getTaggedTextById(id: number): Promise<TaggedText> {
-        return this.client.get<TaggedText>(`/api/tagged_texts/${id}/`)
+        return this.client.get<TaggedText>(`/tagged_texts/${id}/`)
     }
 
     async createTaggedText(
         data: Omit<TaggedText, 'id' | 'created_at' | 'updated_at'>
     ): Promise<TaggedText> {
-        return this.client.post<TaggedText>('/api/tagged_texts/', data)
+        return this.client.post<TaggedText>('/tagged_texts/', data)
     }
 }
 

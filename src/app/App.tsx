@@ -1,19 +1,12 @@
-import React, { useState, useEffect } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import React from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { LoginForm } from '@/features/auth/components/LoginForm'
 import { RegisterForm } from '@/features/auth/components/RegisterForm'
 import { MainLayout } from '@/app/layouts/MainLayout'
 
 function App() {
-    const { isAuthenticated, user, loading } = useAuth() // <- loading qo'shildi
-    const location = useLocation()
-
-    // Debug uchun
-    useEffect(() => {
-        console.log('Auth state changed:', { isAuthenticated, user, loading })
-        console.log('Current path:', location.pathname)
-    }, [isAuthenticated, user, location.pathname, loading])
+    const { isAuthenticated, loading } = useAuth() // <- loading qo'shildi
 
     // Loading bo'lsa, spinner ko'rsatamiz
     if (loading) {
@@ -48,6 +41,53 @@ function App() {
                     }
                 />
 
+                {/* Barcha linguistics sahifalari */}
+                <Route
+                    path='/linguistics'
+                    element={
+                        isAuthenticated ? (
+                            <MainLayout />
+                        ) : (
+                            <Navigate to='/login' replace />
+                        )
+                    }
+                />
+
+                <Route
+                    path='/linguistics/:id'
+                    element={
+                        isAuthenticated ? (
+                            <MainLayout />
+                        ) : (
+                            <Navigate to='/login' replace />
+                        )
+                    }
+                />
+
+                {/* Tags sahifasi */}
+                <Route
+                    path='/tags'
+                    element={
+                        isAuthenticated ? (
+                            <MainLayout />
+                        ) : (
+                            <Navigate to='/login' replace />
+                        )
+                    }
+                />
+
+                {/* Editor sahifasi */}
+                <Route
+                    path='/editor'
+                    element={
+                        isAuthenticated ? (
+                            <MainLayout />
+                        ) : (
+                            <Navigate to='/login' replace />
+                        )
+                    }
+                />
+
                 {/* Login sahifasi */}
                 <Route
                     path='/login'
@@ -71,16 +111,19 @@ function App() {
                         )
                     }
                 />
+
+                {/* Noto'g'ri yo'l uchun */}
+                <Route path='*' element={<Navigate to='/' replace />} />
             </Routes>
         </div>
     )
 }
 
-// Alohida AuthPage komponenti
+// AuthPage komponenti
 const AuthPage: React.FC<{ initialTab: 'login' | 'register' }> = ({
     initialTab,
 }) => {
-    const [isLogin, setIsLogin] = useState(initialTab === 'login')
+    const [isLogin, setIsLogin] = React.useState(initialTab === 'login')
 
     return (
         <div style={{ padding: '20px' }}>

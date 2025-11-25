@@ -1,14 +1,18 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { SidebarSection } from './SidebarSection'
 import './Sidebar.css'
 import { LogoutButton } from '@/features/auth/components/LogoutButton'
+import {
+    linguisticsApi,
+    LinguisticsData,
+    Language,
+} from '@/shared/api/linguistics/linguisticsApi'
 
 interface SidebarProps {
     activeItem?: string
     onItemClick?: (itemText: string) => void
     onEditorClick?: () => void
     onCloseLanguage?: () => void
-    languageItems?: Array<{ id: string; text: string }>
     activeTab?: number
 }
 
@@ -17,16 +21,63 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onItemClick = () => {},
     onEditorClick = () => {},
     onCloseLanguage = () => {},
-    languageItems = [],
     activeTab = 0,
 }) => {
-    // const last7DaysItems = [
-    //     // { id: '9', text: 'Crypto Lending App Name' },
-    //     // { id: '10', text: 'Operator Grammar Types' },
-    // ]
+    const [linguistics, setLinguistics] = useState<LinguisticsData[]>([])
+    const [loading, setLoading] = useState(true)
 
-    const sectionTitle =
-        activeTab === 0 ? 'Morfologik tahlil' : 'Sintaksis tahlil'
+    useEffect(() => {
+        const loadData = async () => {
+            try {
+                setLoading(true)
+                const data = await linguisticsApi.getLinguistics()
+                setLinguistics(data)
+            } catch (error) {
+                console.error('Failed to load linguistics:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        loadData()
+    }, [])
+
+    // Active tab bo'yicha languages ni olish
+    const currentLinguistic = linguistics[activeTab]
+
+    // Agar languages bo'sh bo'lsa, tags dan unique languages ni olamiz
+    const getLanguagesFromTags = (): Language[] => {
+        if (!currentLinguistic) return []
+
+        // Agar languages mavjud bo'lsa, ularni ishlatamiz
+        if (
+            currentLinguistic.languages &&
+            currentLinguistic.languages.length > 0
+        ) {
+            return currentLinguistic.languages
+        }
+
+        // Aks holda, tags dan unique languages larni olamiz
+        const uniqueLanguages: Language[] = []
+        const languageMap = new Map<number, Language>()
+
+        currentLinguistic.tags.forEach((tag) => {
+            if (!languageMap.has(tag.language.id)) {
+                languageMap.set(tag.language.id, tag.language)
+                uniqueLanguages.push(tag.language)
+            }
+        })
+
+        return uniqueLanguages
+    }
+
+    const languages = getLanguagesFromTags()
+    const languageItems = languages.map((lang) => ({
+        id: lang.id.toString(),
+        text: lang.name,
+    }))
+
+    const sectionTitle = currentLinguistic?.name || 'Loading...'
 
     return (
         <div className='sidebar'>
@@ -38,23 +89,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div className='sidebar-content'>
-                <SidebarSection
-                    title={sectionTitle}
-                    items={languageItems}
-                    activeItem={activeItem}
-                    onItemClick={onItemClick}
-                    showDelete={!!activeItem}
-                    onCloseLanguage={onCloseLanguage}
-                />
-
-                {/* <SidebarSection
-                    title='Last 7 Days'
-                    items={last7DaysItems}
-                    activeItem={activeItem}
-                    onItemClick={onItemClick}
-                    showDelete={!!activeItem}
-                    onCloseLanguage={onCloseLanguage}
-                /> */}
+                {loading ? (
+                    <div className='loading'>Loading languages...</div>
+                ) : (
+                    <SidebarSection
+                        title={sectionTitle}
+                        items={languageItems}
+                        activeItem={activeItem}
+                        onItemClick={onItemClick}
+                        showDelete={!!activeItem}
+                        onCloseLanguage={onCloseLanguage}
+                    />
+                )}
             </div>
 
             <div className='sidebar-footer'>
