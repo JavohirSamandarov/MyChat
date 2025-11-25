@@ -55,7 +55,7 @@ export const useAuth = () => {
 
             const userData = await authApi.getProfile()
             setUser(userData)
-            setIsAuthenticated(true)
+            setIsAuthenticated(true) // <- BU MUHIM!
 
             return { success: true }
         } catch (err: unknown) {

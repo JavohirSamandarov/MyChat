@@ -1,21 +1,39 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 
 export const RegisterForm: React.FC = () => {
     const { register, loading, error } = useAuth()
+    const navigate = useNavigate()
     const [formData, setFormData] = useState({
         email: '',
         password: '',
+        password2: '',
         first_name: '',
         last_name: '',
         confirmPassword: '',
     })
     const [message, setMessage] = useState('')
+    const [countdown, setCountdown] = useState(0)
+
+    // Countdown timer
+    useEffect(() => {
+        if (countdown > 0) {
+            const timer = setTimeout(() => {
+                setCountdown(countdown - 1)
+            }, 1000)
+            return () => clearTimeout(timer)
+        } else if (countdown === 0 && message.includes('successful')) {
+            navigate('/login')
+        }
+    }, [countdown, message, navigate])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setMessage('')
+        setCountdown(0)
 
+        // Validation
         if (formData.password !== formData.confirmPassword) {
             setMessage('Passwords do not match!')
             return
@@ -26,25 +44,40 @@ export const RegisterForm: React.FC = () => {
             return
         }
 
+        if (!formData.email.includes('@')) {
+            setMessage('Please enter a valid email address')
+            return
+        }
+
+        console.log('Register attempt with:', formData)
+
         const result = await register({
             email: formData.email,
             password: formData.password,
+            password2: formData.password,
             first_name: formData.first_name,
             last_name: formData.last_name,
         })
 
+        console.log('Register result:', result)
+
         if (result.success) {
-            setMessage('Registration successful! You can now login.')
+            setMessage(
+                'Registration successful! Redirecting to login in 3 seconds...'
+            )
+            setCountdown(3)
+
             // Formni tozalash
             setFormData({
                 email: '',
                 password: '',
+                password2: '',
                 first_name: '',
                 last_name: '',
                 confirmPassword: '',
             })
         } else {
-            setMessage(result.error || 'Registration failed')
+            setMessage(result.error || 'Registration failed. Please try again.')
         }
     }
 
@@ -60,7 +93,7 @@ export const RegisterForm: React.FC = () => {
             className='register-form'
             style={{ maxWidth: '400px', margin: '50px auto', padding: '20px' }}
         >
-            <h2>Register New User</h2>
+            <h2>Create Account</h2>
             <form onSubmit={handleSubmit}>
                 <div className='form-group' style={{ marginBottom: '15px' }}>
                     <label htmlFor='first_name'>First Name:</label>
@@ -75,7 +108,10 @@ export const RegisterForm: React.FC = () => {
                             width: '100%',
                             padding: '8px',
                             marginTop: '5px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
                         }}
+                        placeholder='Enter your first name'
                     />
                 </div>
 
@@ -92,7 +128,10 @@ export const RegisterForm: React.FC = () => {
                             width: '100%',
                             padding: '8px',
                             marginTop: '5px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
                         }}
+                        placeholder='Enter your last name'
                     />
                 </div>
 
@@ -109,7 +148,10 @@ export const RegisterForm: React.FC = () => {
                             width: '100%',
                             padding: '8px',
                             marginTop: '5px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
                         }}
+                        placeholder='Enter your email'
                     />
                 </div>
 
@@ -127,11 +169,14 @@ export const RegisterForm: React.FC = () => {
                             width: '100%',
                             padding: '8px',
                             marginTop: '5px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
                         }}
+                        placeholder='Enter password (min 6 characters)'
                     />
                 </div>
 
-                <div className='form-group' style={{ marginBottom: '15px' }}>
+                <div className='form-group' style={{ marginBottom: '20px' }}>
                     <label htmlFor='confirmPassword'>Confirm Password:</label>
                     <input
                         type='password'
@@ -144,16 +189,25 @@ export const RegisterForm: React.FC = () => {
                             width: '100%',
                             padding: '8px',
                             marginTop: '5px',
+                            border: '1px solid #ddd',
+                            borderRadius: '4px',
                         }}
+                        placeholder='Confirm your password'
                     />
                 </div>
 
                 {error && (
                     <div
                         className='error-message'
-                        style={{ color: 'red', marginBottom: '15px' }}
+                        style={{
+                            color: 'red',
+                            marginBottom: '15px',
+                            padding: '10px',
+                            backgroundColor: '#f8d7da',
+                            borderRadius: '4px',
+                        }}
                     >
-                        {error}
+                        <strong>Error:</strong> {error}
                     </div>
                 )}
 
@@ -162,17 +216,38 @@ export const RegisterForm: React.FC = () => {
                         className='message'
                         style={{
                             color: message.includes('successful')
-                                ? 'green'
-                                : 'red',
+                                ? '#155724'
+                                : '#721c24',
                             marginBottom: '15px',
                             padding: '10px',
                             backgroundColor: message.includes('successful')
                                 ? '#d4edda'
                                 : '#f8d7da',
                             borderRadius: '4px',
+                            border: `1px solid ${
+                                message.includes('successful')
+                                    ? '#c3e6cb'
+                                    : '#f5c6cb'
+                            }`,
                         }}
                     >
-                        {message}
+                        {message.includes('successful') ? (
+                            <div>
+                                <div>✅ Registration successful!</div>
+                                <div
+                                    style={{
+                                        marginTop: '5px',
+                                        fontSize: '14px',
+                                        color: '#0c5460',
+                                    }}
+                                >
+                                    Redirecting to login in {countdown}{' '}
+                                    seconds...
+                                </div>
+                            </div>
+                        ) : (
+                            message
+                        )}
                     </div>
                 )}
 
@@ -181,17 +256,42 @@ export const RegisterForm: React.FC = () => {
                     disabled={loading}
                     style={{
                         width: '100%',
-                        padding: '10px',
-                        backgroundColor: loading ? '#ccc' : '#28a745',
+                        padding: '12px',
+                        backgroundColor: loading ? '#6c757d' : '#28a745',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
                         cursor: loading ? 'not-allowed' : 'pointer',
+                        fontSize: '16px',
+                        fontWeight: 'bold',
                     }}
                 >
-                    {loading ? 'Registering...' : 'Register'}
+                    {loading ? 'Creating Account...' : 'Create Account'}
                 </button>
             </form>
+
+            <div
+                style={{
+                    textAlign: 'center',
+                    marginTop: '20px',
+                    paddingTop: '20px',
+                    borderTop: '1px solid #ddd',
+                }}
+            >
+                <p style={{ margin: 0, color: '#6c757d' }}>
+                    Already have an account?{' '}
+                    <Link
+                        to='/login'
+                        style={{
+                            color: '#007bff',
+                            textDecoration: 'none',
+                            fontWeight: 'bold',
+                        }}
+                    >
+                        Sign In
+                    </Link>
+                </p>
+            </div>
         </div>
     )
 }
