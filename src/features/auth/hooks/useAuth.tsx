@@ -15,16 +15,21 @@ interface ApiError {
 
 export const useAuth = () => {
     const [user, setUser] = useState<User | null>(null)
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
+    const [isAuthenticated, setIsAuthenticated] = useState(false)
 
     const loadUserProfile = useCallback(async () => {
         try {
             const userData = await authApi.getProfile()
             setUser(userData)
+            setIsAuthenticated(true)
         } catch (err) {
             console.error('Failed to load user profile:', err)
-            logout()
+            setUser(null)
+            setIsAuthenticated(false)
+        } finally {
+            setLoading(false)
         }
     }, [])
 
@@ -32,6 +37,10 @@ export const useAuth = () => {
         const token = localStorage.getItem('access_token')
         if (token) {
             loadUserProfile()
+        } else {
+            setLoading(false)
+            setIsAuthenticated(false)
+            setUser(null)
         }
     }, [loadUserProfile])
 
@@ -46,12 +55,14 @@ export const useAuth = () => {
 
             const userData = await authApi.getProfile()
             setUser(userData)
+            setIsAuthenticated(true)
 
             return { success: true }
         } catch (err: unknown) {
             const error = err as ApiError
             const errorMessage = error.response?.data?.detail || 'Login failed'
             setError(errorMessage)
+            setIsAuthenticated(false)
             return { success: false, error: errorMessage }
         } finally {
             setLoading(false)
@@ -67,7 +78,6 @@ export const useAuth = () => {
             return { success: true, data: response }
         } catch (err: unknown) {
             const error = err as ApiError
-            console.log('Registration error:', error)
 
             let errorMessage = 'Registration failed'
             if (error.response?.data?.email) {
@@ -90,6 +100,8 @@ export const useAuth = () => {
     const logout = () => {
         authApi.logout()
         setUser(null)
+        setIsAuthenticated(false)
+        setError(null)
     }
 
     const changePassword = async (oldPassword: string, newPassword: string) => {
@@ -115,6 +127,6 @@ export const useAuth = () => {
         register,
         logout,
         changePassword,
-        isAuthenticated: !!user,
+        isAuthenticated,
     }
 }

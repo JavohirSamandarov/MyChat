@@ -1,19 +1,89 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { LoginForm } from '@/features/auth/components/LoginForm'
 import { RegisterForm } from '@/features/auth/components/RegisterForm'
 import { MainLayout } from '@/app/layouts/MainLayout'
 
 function App() {
-    const { isAuthenticated } = useAuth()
-    const [isLogin, setIsLogin] = React.useState(true)
+    const { isAuthenticated, user, loading } = useAuth() // <- loading qo'shildi
+    const location = useLocation()
 
-    if (isAuthenticated) {
-        return <MainLayout />
+    // Debug uchun
+    useEffect(() => {
+        console.log('Auth state changed:', { isAuthenticated, user, loading })
+        console.log('Current path:', location.pathname)
+    }, [isAuthenticated, user, location.pathname, loading])
+
+    // Loading bo'lsa, spinner ko'rsatamiz
+    if (loading) {
+        return (
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    height: '100vh',
+                    fontSize: '18px',
+                    color: '#666',
+                }}
+            >
+                Loading...
+            </div>
+        )
     }
 
     return (
         <div className='App'>
+            <Routes>
+                {/* Asosiy sahifa */}
+                <Route
+                    path='/'
+                    element={
+                        isAuthenticated ? (
+                            <MainLayout />
+                        ) : (
+                            <Navigate to='/login' replace />
+                        )
+                    }
+                />
+
+                {/* Login sahifasi */}
+                <Route
+                    path='/login'
+                    element={
+                        !isAuthenticated ? (
+                            <AuthPage initialTab='login' />
+                        ) : (
+                            <Navigate to='/' replace />
+                        )
+                    }
+                />
+
+                {/* Register sahifasi */}
+                <Route
+                    path='/register'
+                    element={
+                        !isAuthenticated ? (
+                            <AuthPage initialTab='register' />
+                        ) : (
+                            <Navigate to='/' replace />
+                        )
+                    }
+                />
+            </Routes>
+        </div>
+    )
+}
+
+// Alohida AuthPage komponenti
+const AuthPage: React.FC<{ initialTab: 'login' | 'register' }> = ({
+    initialTab,
+}) => {
+    const [isLogin, setIsLogin] = useState(initialTab === 'login')
+
+    return (
+        <div style={{ padding: '20px' }}>
             <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                 <button
                     onClick={() => setIsLogin(true)}
