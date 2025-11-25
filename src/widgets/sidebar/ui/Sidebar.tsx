@@ -1,6 +1,7 @@
 import React from 'react'
 import { SidebarSection } from './SidebarSection'
 import './Sidebar.css'
+import { LogoutButton } from '@/features/auth/components/LogoutButton'
 
 interface SidebarProps {
     activeItem?: string
@@ -57,12 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div className='sidebar-footer'>
-                <div className='profile-section'>
-                    <div className='profile-avatar'>AN</div>
-                    <div className='profile-info'>
-                        <div className='profile-name'>Andrew Neilson</div>
-                    </div>
-                </div>
+                <LogoutButton />
             </div>
         </div>
     )
