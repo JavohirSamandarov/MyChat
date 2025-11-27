@@ -11,6 +11,7 @@ export interface Language {
 }
 
 export interface Tag {
+    id: number
     language: Language
     name_tag: string
     abbreviation: string
@@ -47,6 +48,32 @@ export interface TaggedText {
     tags: number[]
     created_at: string
     updated_at: string
+}
+
+// YANGI: Annotation interfeyslari
+export interface Annotation {
+    id: number
+    text: string
+    start_pos: number
+    end_pos: number
+    tag_id: number
+    tagged_text_id: number
+    created_at: string
+    updated_at: string
+}
+
+export interface CreateAnnotationRequest {
+    text: string
+    start_pos: number
+    end_pos: number
+    tag_id: number
+    tagged_text_id: number
+}
+
+export interface UpdateTaggedTextRequest {
+    title?: string
+    content?: string
+    tags?: number[]
 }
 
 class LinguisticsApi {
@@ -90,6 +117,28 @@ class LinguisticsApi {
         data: Omit<TaggedText, 'id' | 'created_at' | 'updated_at'>
     ): Promise<TaggedText> {
         return this.client.post<TaggedText>('/tagged_texts/', data)
+    }
+
+    async updateTaggedText(
+        id: number,
+        data: UpdateTaggedTextRequest
+    ): Promise<TaggedText> {
+        return this.client.patch<TaggedText>(`/tagged_texts/${id}/`, data)
+    }
+
+    // YANGI: Annotation API lar
+    async createAnnotation(data: CreateAnnotationRequest): Promise<Annotation> {
+        return this.client.post<Annotation>('/annotations/', data)
+    }
+
+    async getAnnotationsByTextId(taggedTextId: number): Promise<Annotation[]> {
+        return this.client.get<Annotation[]>(
+            `/annotations/?tagged_text_id=${taggedTextId}`
+        )
+    }
+
+    async deleteAnnotation(id: number): Promise<void> {
+        return this.client.delete(`/annotations/${id}/`)
     }
 }
 
