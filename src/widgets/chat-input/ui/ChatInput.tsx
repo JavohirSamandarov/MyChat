@@ -386,18 +386,91 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
     }
 
+    const getUserId = (): number | null => {
+        try {
+            // 1. LocalStorage dan user ma'lumotlarini tekshirish
+            const userData = localStorage.getItem('user_data')
+            if (userData) {
+                const user = JSON.parse(userData)
+                if (user.id) return user.id
+                if (user.user_id) return user.user_id
+            }
+
+            // 2. Alohida user_id saqlangan bo'lsa
+            const userId = localStorage.getItem('user_id')
+            if (userId) return parseInt(userId)
+
+            // 3. Token dan olish
+            const token = getAuthToken()
+            if (token) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]))
+                    return payload.user_id || payload.sub || null
+                } catch (e) {
+                    console.warn('Token decode error:', e)
+                }
+            }
+
+            return null
+        } catch (error) {
+            console.error('Error getting user ID:', error)
+            return null
+        }
+    }
+
     const sendToBackend = async (htmlContent: string): Promise<boolean> => {
         try {
             const authToken = getAuthToken()
+            if (!authToken) {
+                showNotification(
+                    'Authentication required. Please login.',
+                    'error'
+                )
+                return false
+            }
+
+            const userId = getUserId()
+            if (!userId) {
+                showNotification(
+                    'User information not found. Please login again.',
+                    'error'
+                )
+                return false
+            }
+
+            // HTML ni plain text ga o'zgartirish
+            const tempDiv = document.createElement('div')
+            tempDiv.innerHTML = htmlContent
+            const plainText = tempDiv.textContent || tempDiv.innerText || ''
+
+            // Title ni yasash
+            const words = plainText
+                .trim()
+                .split(/\s+/)
+                .filter((word) => word.length > 0)
+            let title = 'New Text'
+
+            if (words.length > 0) {
+                title = words.slice(0, 3).join(' ')
+                if (words.length > 3) {
+                    title += '...'
+                }
+            }
 
             const requestData = {
-                text: htmlContent,
-                metadata: JSON.stringify({
-                    title: `Text ${new Date().toLocaleString()}`,
-                    tags: [],
-                }),
-                language_id: languageId,
+                user: userId,
+                language: languageId,
+                title: title,
+                text: plainText,
+                metadata: {
+                    created_at: new Date().toISOString(),
+                    character_count: plainText.length,
+                    word_count: words.length,
+                    source: 'web_editor',
+                },
             }
+
+            console.log('Sending data to backend:', requestData)
 
             const response = await fetch('/api/tagged_texts/', {
                 method: 'POST',
@@ -412,14 +485,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             if (response.ok) {
                 const result = await response.json()
                 console.log('Text saved successfully:', result)
+                showNotification('Text saved successfully!')
                 return true
             } else {
                 const errorText = await response.text()
                 console.error('Backend error response:', errorText)
+                showNotification('Failed to save text', 'error')
                 return false
             }
         } catch (error) {
             console.error('Backend error:', error)
+            showNotification('Error saving text', 'error')
             return false
         }
     }
