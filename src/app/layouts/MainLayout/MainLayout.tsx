@@ -25,7 +25,6 @@ const MainLayout: React.FC = () => {
             try {
                 setLoading(true)
                 const data = await linguisticsApi.getLinguistics()
-                console.log('Linguistics API data:', data)
                 setLinguistics(data)
             } catch (error) {
                 console.error('Failed to load linguistics:', error)
@@ -84,9 +83,6 @@ const MainLayout: React.FC = () => {
             console.log('No current linguistic for tab:', activeTab)
             return []
         }
-
-        console.log('Current linguistic:', currentLinguistic.name)
-        console.log('Active language:', activeLanguage)
 
         // Agar language tanlangan bo'lsa, faqat o'sha language dagi tag'larni olish
         if (activeLanguage) {

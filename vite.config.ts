@@ -14,9 +14,11 @@ export default defineConfig({
         },
     },
     server: {
+        host: true,
+        port: 5173,
         proxy: {
             '/api': {
-                target: 'http://45.138.158.87:8000',
+                target: 'https://api.tilshunoslik.uz/',
                 changeOrigin: true,
                 secure: false,
                 rewrite: (path) => path,

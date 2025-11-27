@@ -12,7 +12,6 @@ class AuthApi {
     private client: ApiClient
 
     constructor() {
-        console.log('AuthApi initialized with URL:', API_BASE_URL)
         this.client = new ApiClient(API_BASE_URL)
     }
 
@@ -52,10 +51,8 @@ class AuthApi {
     }
 
     async getProfile(): Promise<User> {
-        console.log('Get profile request')
         try {
             const response = await this.client.get<User>('/users/me/')
-            console.log('Profile success:', response)
             return response
         } catch (error: any) {
             console.log('Profile error:', error)

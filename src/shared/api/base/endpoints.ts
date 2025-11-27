@@ -1,8 +1,6 @@
 export const API_BASE_URL =
     import.meta.env.VITE_API_BASE_URL || 'http://localhost:5173/api'
 
-console.log('API Base URL:', API_BASE_URL) // Debug uchun
-
 // Auth endpoints
 export const AUTH_ENDPOINTS = {
     LOGIN: '/auth/token/',

@@ -1,6 +1,6 @@
 .chat-input-container {
     width: 100%;
-    max-width: 900px;
+    /* max-width: 900px; */
     margin: 0 auto;
 }
 
@@ -22,6 +22,7 @@
 .chat-input-wrapper {
     position: relative;
     width: 100%;
+    height: calc(100vh - 100px);
 }
 
 /* Yangi editor uchun style */
@@ -47,10 +48,10 @@
     overflow-y: auto;
 }
 
-.chat-input-editor:focus {
+/* .chat-input-editor:focus {
     border-color: #fff;
     opacity: 0.8;
-}
+} */
 
 .chat-input-container.fullscreen .chat-input-editor:focus {
     border-color: #fff;

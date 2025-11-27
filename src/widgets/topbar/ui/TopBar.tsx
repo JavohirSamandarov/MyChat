@@ -23,7 +23,6 @@ export const Topbar: React.FC<TopbarProps> = ({
             try {
                 setLoading(true)
                 const data = await linguisticsApi.getLinguistics()
-                console.log('Linguistics data:', data) // Debug
                 setLinguistics(data)
             } catch (error) {
                 console.error('Failed to load linguistics:', error)
