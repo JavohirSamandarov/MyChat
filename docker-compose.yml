@@ -1,0 +1,11 @@
+services:
+  frontend_builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: frontend_builder
+    volumes:
+      - ./dist:/app/dist
+    env_file:
+      - .env
+    restart: always
