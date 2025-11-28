@@ -1,19 +1,13 @@
-# Stage 1 — Build React app
-FROM node:20-alpine AS build
-
+# Build the React app
+FROM node:18 AS builder
 WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm ci
-
+COPY package*.json ./
+RUN npm install
 COPY . .
 RUN npm run build
 
-# Stage 2 — Export build artifacts
-FROM alpine:latest
-
-WORKDIR /app
-
-COPY --from=build /app/dist ./dist
-
-CMD ["sh", "-c", "echo 'React build complete. Copy /app/dist to your Nginx root.' && tail -f /dev/null"]
+# Serve with Nginx
+FROM nginx:stable-alpine
+COPY --from=builder /app/build /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
