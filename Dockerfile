@@ -1,13 +1,19 @@
-# Build the React app
-FROM node:18 AS builder
+# Stage 1 — Build React app
+FROM node:20-alpine AS builder
+
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
 COPY . .
 RUN npm run build
 
-# Serve with Nginx
+# Stage 2 — Nginx
 FROM nginx:stable-alpine
-COPY --from=builder /app/build /usr/share/nginx/html
+
+# Copy Vite build output (dist) to Nginx html
+COPY --from=builder /app/dist /usr/share/nginx/html
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
