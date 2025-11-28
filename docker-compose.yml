@@ -4,6 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: frontend_builder
+    volumes:
+      - .:/app
+      - /app/node_modules
     env_file:
       - .env
     restart: always
