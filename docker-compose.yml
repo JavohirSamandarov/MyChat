@@ -1,12 +1,11 @@
+version: "3.9"
+
 services:
-  frontend_builder:
+  frontend:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: frontend_builder
-    volumes:
-      - .:/app
-      - /app/node_modules
-    env_file:
-      - .env
+    container_name: mychat_frontend
+    ports:
+      - "3000:80"
     restart: always
