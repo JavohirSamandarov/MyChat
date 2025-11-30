@@ -1,0 +1,89 @@
+.tag-statistics {
+    background: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 16px;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.tag-statistics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.tag-statistics-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.total-tags {
+    font-size: 12px;
+    color: #6c757d;
+    background: #e9ecef;
+    padding: 4px 8px;
+    border-radius: 12px;
+}
+
+.tag-statistics-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.tag-stat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px;
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.tag-stat-item:hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.tag-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tag-abbreviation {
+    font-weight: 600;
+    font-size: 14px;
+    color: #333;
+}
+
+.tag-count {
+    font-size: 14px;
+    font-weight: 600;
+    color: #495057;
+    background: #f8f9fa;
+    padding: 4px 10px;
+    border-radius: 12px;
+    min-width: 30px;
+    text-align: center;
+}
+
+.tag-color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.no-tags-message {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 40px 20px;
+}

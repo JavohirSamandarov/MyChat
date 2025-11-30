@@ -172,3 +172,28 @@
 .sidebar-content::-webkit-scrollbar-thumb:hover {
     background: #a8a8a8;
 }
+
+/* Sidebar.css ga qo'shimchalar */
+.sidebar-item.text-item {
+    padding-left: 12px;
+}
+
+.sidebar-item-icon {
+    margin-right: 8px;
+    font-size: 14px;
+}
+
+.sidebar-empty {
+    padding: 8px 12px;
+    color: #999;
+    font-size: 14px;
+    font-style: italic;
+    text-align: center;
+}
+
+.loading {
+    padding: 8px 12px;
+    color: #666;
+    font-size: 14px;
+    text-align: center;
+}

@@ -1,4 +1,3 @@
-// src/widgets/sidebar/ui/SidebarItem.tsx
 import React from 'react'
 
 interface SidebarItemProps {
@@ -7,6 +6,7 @@ interface SidebarItemProps {
     onClick: () => void
     showDelete: boolean
     onDelete?: () => void
+    languageId?: number
 }
 
 export const SidebarItem: React.FC<SidebarItemProps> = ({
@@ -15,9 +15,10 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
     onClick,
     showDelete,
     onDelete = () => {},
+    languageId,
 }) => {
     const handleDeleteClick = (e: React.MouseEvent) => {
-        e.stopPropagation() // Item bosilishini oldini olish
+        e.stopPropagation()
         onDelete()
     }
 

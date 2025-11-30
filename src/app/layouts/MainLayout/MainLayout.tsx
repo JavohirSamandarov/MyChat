@@ -7,6 +7,7 @@ import {
     LinguisticsData,
     Tag,
 } from '@/shared/api/linguistics/linguisticsApi'
+import { TagStatistics } from '@/widgets/tagstatistics'
 
 const MainLayout: React.FC = () => {
     const [activeTab, setActiveTab] = useState<number>(0)
@@ -16,10 +17,17 @@ const MainLayout: React.FC = () => {
     const [activeLanguage, setActiveLanguage] = useState<string>('')
     const [linguistics, setLinguistics] = useState<LinguisticsData[]>([])
     const [loading, setLoading] = useState(true)
+    const [selectedLanguageId, setSelectedLanguageId] = useState<number | null>(
+        null
+    )
+    // YANGI: Analysis type state - faqat 1 dan boshlansin
+    const [selectedAnalysisType, setSelectedAnalysisType] = useState<number>(1)
+    const [tagStats, setTagStats] = useState<
+        Record<string, { count: number; color: string }>
+    >({})
 
     const navigate = useNavigate()
 
-    // API dan linguistics ma'lumotlarini olish
     useEffect(() => {
         const loadData = async () => {
             try {
@@ -43,22 +51,29 @@ const MainLayout: React.FC = () => {
         setShowChatInput(true)
         setShowContentMenu(false)
         setActiveLanguage('')
+        setSelectedLanguageId(null)
+        // YANGI: Tab o'zgarganda analysis type ni 1 ga qaytaramiz
+        setSelectedAnalysisType(1)
 
-        // URL ni yangilash
         const linguisticId = linguistics[tabIndex]?.id
         if (linguisticId) {
             navigate(`/linguistics/${linguisticId}`)
         }
     }
 
-    const handleSidebarItemClick = (itemText: string) => {
-        console.log('Sidebar item clicked:', itemText)
+    const handleSidebarItemClick = (itemText: string, languageId?: number) => {
+        console.log(
+            'Sidebar item clicked:',
+            itemText,
+            'Language ID:',
+            languageId
+        )
         setSidebarActiveItem(itemText)
         setShowChatInput(false)
         setShowContentMenu(true)
         setActiveLanguage(itemText)
+        setSelectedLanguageId(languageId || null)
 
-        // URL ni yangilash
         navigate(`/tags?language=${encodeURIComponent(itemText)}`)
     }
 
@@ -67,6 +82,7 @@ const MainLayout: React.FC = () => {
         setShowContentMenu(false)
         setSidebarActiveItem('')
         setActiveLanguage('')
+        setSelectedLanguageId(null)
         navigate('/')
     }
 
@@ -76,7 +92,7 @@ const MainLayout: React.FC = () => {
         navigate('/editor')
     }
 
-    // Active linguistics va language bo'yicha tag'larni olish
+    // YANGI: languageId ni ChatInput ga uzatish
     const getCurrentTags = (): Tag[] => {
         const currentLinguistic = linguistics[activeTab]
         if (!currentLinguistic) {
@@ -84,7 +100,6 @@ const MainLayout: React.FC = () => {
             return []
         }
 
-        // Agar language tanlangan bo'lsa, faqat o'sha language dagi tag'larni olish
         if (activeLanguage) {
             const filteredTags = currentLinguistic.tags.filter(
                 (tag) => tag.language.name === activeLanguage
@@ -97,7 +112,6 @@ const MainLayout: React.FC = () => {
         return currentLinguistic.tags
     }
 
-    // English uchun Universal POS tags jadvali
     const renderEnglishContent = () => {
         const tags = getCurrentTags()
 
@@ -162,7 +176,6 @@ const MainLayout: React.FC = () => {
         )
     }
 
-    // O'zbek tili uchun content
     const renderUzbekContent = () => {
         const tags = getCurrentTags()
 
@@ -263,7 +276,12 @@ const MainLayout: React.FC = () => {
             />
 
             <div className='main-content'>
-                <Topbar activeTab={activeTab} onTabChange={handleTabChange} />
+                {/* YANGI: Faqat mavjud prop larni uzatamiz */}
+                <Topbar
+                    activeTab={activeTab}
+                    onTabChange={handleTabChange}
+                    // onAnalysisTypeSelect va selectedAnalysisType ni OLIB TASHLAYMIZ
+                />
 
                 <div className='content-area'>
                     {showContentMenu && (
@@ -273,12 +291,26 @@ const MainLayout: React.FC = () => {
                     )}
 
                     {showChatInput && (
-                        <div className='chat-input-wrapper'>
-                            <ChatInput
-                                onSendMessage={(message) =>
-                                    console.log(message)
-                                }
-                            />
+                        <div className='main-content-wrapper'>
+                            {/* 80% ChatInput */}
+                            <div className='chat-input-section'>
+                                {/* YANGI: analysisType ni ChatInput ga uzatish */}
+                                <ChatInput
+                                    onSendMessage={(message) =>
+                                        console.log(message)
+                                    }
+                                    languageId={selectedLanguageId || undefined}
+                                    analysisType={selectedAnalysisType}
+                                    onStatisticsUpdate={(stats) => {
+                                        setTagStats(stats)
+                                    }}
+                                />
+                            </div>
+
+                            {/* 20% Statistics */}
+                            <div className='statistics-section'>
+                                <TagStatistics stats={tagStats} />
+                            </div>
                         </div>
                     )}
                 </div>

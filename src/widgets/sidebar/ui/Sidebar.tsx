@@ -10,7 +10,7 @@ import {
 
 interface SidebarProps {
     activeItem?: string
-    onItemClick?: (itemText: string) => void
+    onItemClick?: (itemText: string, languageId?: number) => void
     onEditorClick?: () => void
     onCloseLanguage?: () => void
     activeTab?: number
@@ -42,14 +42,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         loadData()
     }, [])
 
-    // Active tab bo'yicha languages ni olish
     const currentLinguistic = linguistics[activeTab]
 
-    // Agar languages bo'sh bo'lsa, tags dan unique languages ni olamiz
     const getLanguagesFromTags = (): Language[] => {
         if (!currentLinguistic) return []
 
-        // Agar languages mavjud bo'lsa, ularni ishlatamiz
         if (
             currentLinguistic.languages &&
             currentLinguistic.languages.length > 0
@@ -57,7 +54,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return currentLinguistic.languages
         }
 
-        // Aks holda, tags dan unique languages larni olamiz
         const uniqueLanguages: Language[] = []
         const languageMap = new Map<number, Language>()
 
@@ -75,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const languageItems = languages.map((lang) => ({
         id: lang.id.toString(),
         text: lang.name,
+        languageId: lang.id, // YANGI: languageId qo'shildi
     }))
 
     const sectionTitle = currentLinguistic?.name || 'Loading...'

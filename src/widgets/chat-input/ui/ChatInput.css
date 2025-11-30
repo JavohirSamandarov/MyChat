@@ -1,6 +1,5 @@
 .chat-input-container {
     width: 100%;
-    /* max-width: 900px; */
     margin: 0 auto;
 }
 
@@ -10,7 +9,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 10000; /* Oshirildi */
+    z-index: 10000;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -25,7 +24,6 @@
     height: calc(100vh - 100px);
 }
 
-/* Yangi editor uchun style */
 .chat-input-editor {
     color: #56637e;
     width: 100%;
@@ -48,11 +46,6 @@
     overflow-y: auto;
 }
 
-/* .chat-input-editor:focus {
-    border-color: #fff;
-    opacity: 0.8;
-} */
-
 .chat-input-container.fullscreen .chat-input-editor:focus {
     border-color: #fff;
     opacity: 1;
@@ -68,6 +61,7 @@
     border-width: 3px;
 }
 
+/* YANGI: Actions layout */
 .chat-input-actions {
     position: absolute;
     right: 12px;
@@ -80,14 +74,27 @@
 .chat-input-container.fullscreen .chat-input-actions {
     right: 24px;
     bottom: 24px;
-    z-index: 10002; /* Buttonlar uchun */
+    z-index: 10002;
+}
+
+/* YANGI: Left actions */
+.left-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.right-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
 }
 
 .save-button {
     background-color: #007bff;
     border: none;
     border-radius: 8px;
-    padding: 4.5px 20px;
+    padding: 8px 16px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -97,6 +104,7 @@
     flex-shrink: 0;
     font-size: 14px;
     font-weight: 500;
+    gap: 6px;
 }
 
 .save-button:hover:not(:disabled) {
@@ -109,17 +117,39 @@
     transform: none;
 }
 
-.fullscreen-button {
-    background: none;
-    border: 1px solid #fff;
+.import-export-button {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
     border-radius: 8px;
-    width: 24px;
-    height: 24px;
+    padding: 8px 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: #456288;
+    color: #495057;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    font-size: 14px;
+    font-weight: 500;
+    gap: 6px;
+}
+
+.import-export-button:hover {
+    background-color: #e9ecef;
+    border-color: #adb5bd;
+}
+
+.fullscreen-button {
+    background: none;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #495057;
     transition: all 0.2s ease;
     flex-shrink: 0;
 }
@@ -129,7 +159,6 @@
     color: #007bff;
 }
 
-/* Fullscreen mode specific styles */
 .chat-input-container.fullscreen .fullscreen-button {
     background-color: #007bff;
     border-color: #007bff;
@@ -141,6 +170,53 @@
     border-color: #0056b3;
 }
 
+/* YANGI: Import/Export menu */
+.import-export-menu {
+    position: absolute;
+    bottom: 60px;
+    right: 55px;
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    z-index: 10001;
+    min-width: 150px;
+}
+
+.import-button,
+.export-button {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 8px 12px;
+    margin: 2px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+    gap: 8px;
+}
+
+.import-button {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.import-button:hover {
+    background: #bbdefb;
+}
+
+.export-button {
+    background: #e8f5e8;
+    color: #2e7d32;
+}
+
+.export-button:hover {
+    background: #c8e6c9;
+}
+
 /* Annotated text styles */
 .annotated-text {
     font-weight: 600;
@@ -148,7 +224,7 @@
     transition: all 0.2s ease;
     cursor: pointer;
     position: relative;
-    background-color: #e3f2fd; /* Rang qo'shildi */
+    background-color: #e3f2fd;
     padding: 2px 6px;
     margin: 0 2px;
     display: inline-block;
@@ -159,10 +235,10 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Tag menu styles - ENG MUHIM */
+/* Tag menu styles */
 .tag-menu {
     position: fixed !important;
-    z-index: 2147483647 !important; /* Maximum z-index */
+    z-index: 2147483647 !important;
     animation: fadeInUp 0.2s ease;
     border: 1px solid #e9ecef !important;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12) !important;
@@ -243,7 +319,6 @@
     opacity: 0.5;
 }
 
-/* Button ko'rinishi uchun */
 .chat-input-container.fullscreen .save-button,
 .chat-input-container.fullscreen .fullscreen-button {
     opacity: 1 !important;
