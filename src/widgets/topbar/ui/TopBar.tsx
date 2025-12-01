@@ -9,6 +9,8 @@ import {
 interface TopbarProps {
     activeTab?: number
     onTabChange?: (tabIndex: number) => void
+    onAnalysisTypeSelect?: (typeId: number) => void
+    selectedAnalysisType?: number
 }
 
 export const Topbar: React.FC<TopbarProps> = ({
