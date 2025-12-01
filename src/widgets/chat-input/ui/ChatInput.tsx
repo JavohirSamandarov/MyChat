@@ -751,15 +751,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             console.log('Sending data to backend:', requestData)
 
             // API request
-            const response = await fetch('/tagged_texts/', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    Authorization: `Bearer ${authToken}`,
-                },
-                body: JSON.stringify(requestData),
-            })
+            const response = await fetch(
+                `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        Authorization: `Bearer ${authToken}`,
+                    },
+                    body: JSON.stringify(requestData),
+                }
+            )
 
             // Response ni tekshirish
             if (response.ok) {
