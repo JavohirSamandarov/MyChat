@@ -20,6 +20,7 @@ interface ChatInputProps {
     onStatisticsUpdate?: (
         stats: Record<string, { count: number; color: string }>
     ) => void
+    textId?: number
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -28,6 +29,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     languageId,
     analysisType = 0,
     onStatisticsUpdate,
+    textId,
 }) => {
     const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
     const [showTagMenu, setShowTagMenu] = useState(false)
@@ -77,6 +79,68 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             setHasContent(hasText)
         }
     }, [])
+
+    useEffect(() => {
+        const loadText = async () => {
+            if (textId) {
+                try {
+                    console.log('Loading text with ID:', textId)
+
+                    const authToken = getAuthToken()
+                    if (!authToken) {
+                        showNotification('Authentication required', 'error')
+                        return
+                    }
+
+                    const response = await fetch(
+                        `/api/tagged_texts/${textId}/`,
+                        {
+                            headers: {
+                                Authorization: `Bearer ${authToken}`,
+                                Accept: 'application/json',
+                            },
+                        }
+                    )
+
+                    if (response.ok) {
+                        const textData = await response.json()
+                        console.log('Text loaded:', textData)
+
+                        // Editorga textni yuklash
+                        if (editorRef.current) {
+                            // Oddiy textni yuklash (HTML emas)
+                            editorRef.current.textContent = textData.text
+                            checkContent()
+                            updateTagStatistics()
+
+                            console.log(
+                                'Text loaded successfully:',
+                                textData.title
+                            )
+                            showNotification(
+                                `"${textData.title}" loaded`,
+                                'success'
+                            )
+                        }
+                    } else {
+                        throw new Error('Failed to load text')
+                    }
+                } catch (error) {
+                    console.error('Failed to load text:', error)
+                    showNotification('Failed to load text', 'error')
+                }
+            } else {
+                // Yangi text - editorni tozalash
+                if (editorRef.current) {
+                    editorRef.current.innerHTML = ''
+                    setHasContent(false)
+                    updateTagStatistics()
+                }
+            }
+        }
+
+        loadText()
+    }, [textId])
 
     // Teglarni yuklash
     useEffect(() => {

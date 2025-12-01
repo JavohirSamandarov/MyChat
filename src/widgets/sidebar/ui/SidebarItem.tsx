@@ -6,7 +6,7 @@ interface SidebarItemProps {
     onClick: () => void
     showDelete: boolean
     onDelete?: () => void
-    languageId?: number
+    textId?: number
 }
 
 export const SidebarItem: React.FC<SidebarItemProps> = ({
@@ -15,18 +15,23 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
     onClick,
     showDelete,
     onDelete = () => {},
-    languageId,
+    textId,
 }) => {
     const handleDeleteClick = (e: React.MouseEvent) => {
         e.stopPropagation()
         onDelete()
     }
 
+    const isTextItem = !!textId
+
     return (
         <li
-            className={`sidebar-item ${isActive ? 'active' : ''}`}
+            className={`sidebar-item ${isActive ? 'active' : ''} ${
+                isTextItem ? 'text-item' : ''
+            }`}
             onClick={onClick}
         >
+            {isTextItem && <span className='sidebar-item-icon'>📄</span>}
             <span className='sidebar-item-text'>{text}</span>
             {showDelete && (
                 <button

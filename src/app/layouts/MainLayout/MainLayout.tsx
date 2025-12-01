@@ -20,11 +20,13 @@ const MainLayout: React.FC = () => {
     const [selectedLanguageId, setSelectedLanguageId] = useState<number | null>(
         null
     )
-    // YANGI: Analysis type state - faqat 1 dan boshlansin
+    // YANGI: Analysis type state
     const [selectedAnalysisType, setSelectedAnalysisType] = useState<number>(1)
     const [tagStats, setTagStats] = useState<
         Record<string, { count: number; color: string }>
     >({})
+    // YANGI: Text ID state
+    const [textId, setTextId] = useState<number | undefined>(undefined)
 
     const navigate = useNavigate()
 
@@ -44,6 +46,57 @@ const MainLayout: React.FC = () => {
         loadData()
     }, [])
 
+    const handleTextItemClick = async (textId: number, textTitle: string) => {
+        // Text ID ni saqlash
+        setTextId(textId)
+        setSidebarActiveItem(textTitle)
+        setShowChatInput(true)
+        setShowContentMenu(false)
+        setSelectedLanguageId(null) // Avval tozalash
+
+        // Text ma'lumotlarini yuklash
+        try {
+            const authToken =
+                localStorage.getItem('auth_token') ||
+                localStorage.getItem('access_token')
+            if (!authToken) {
+                return
+            }
+
+            const response = await fetch(`/api/tagged_texts/${textId}/`, {
+                headers: {
+                    Authorization: `Bearer ${authToken}`,
+                    Accept: 'application/json',
+                },
+            })
+
+            if (response.ok) {
+                const textData = await response.json()
+
+                // Textning language_id sini olish
+                if (textData.language) {
+                    // Tilni avtomatik tanlash
+                    setSelectedLanguageId(textData.language)
+
+                    // O'sha tilni sidebar'dan ham aktiv qilish
+                    const currentLinguistic = linguistics[activeTab]
+                    if (currentLinguistic?.languages) {
+                        const language = currentLinguistic.languages.find(
+                            (lang) => lang.id === textData.language
+                        )
+                        if (language) {
+                            console.log('Found language:', language.name)
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load text language:', error)
+        }
+
+        navigate(`/editor?text=${textId}`)
+    }
+
     const handleTabChange = (tabIndex: number) => {
         console.log('Tab changed to:', tabIndex)
         setActiveTab(tabIndex)
@@ -52,8 +105,8 @@ const MainLayout: React.FC = () => {
         setShowContentMenu(false)
         setActiveLanguage('')
         setSelectedLanguageId(null)
-        // YANGI: Tab o'zgarganda analysis type ni 1 ga qaytaramiz
-        setSelectedAnalysisType(1)
+        setTextId(undefined) // YANGI: Text ID ni ham tozalash
+        setSelectedAnalysisType(0)
 
         const linguisticId = linguistics[tabIndex]?.id
         if (linguisticId) {
@@ -61,18 +114,17 @@ const MainLayout: React.FC = () => {
         }
     }
 
+    const handleAnalysisTypeSelect = (typeId: number) => {
+        setSelectedAnalysisType(typeId)
+    }
+
     const handleSidebarItemClick = (itemText: string, languageId?: number) => {
-        console.log(
-            'Sidebar item clicked:',
-            itemText,
-            'Language ID:',
-            languageId
-        )
         setSidebarActiveItem(itemText)
         setShowChatInput(false)
         setShowContentMenu(true)
         setActiveLanguage(itemText)
         setSelectedLanguageId(languageId || null)
+        setTextId(undefined) // YANGI: Text ID ni tozalash
 
         navigate(`/tags?language=${encodeURIComponent(itemText)}`)
     }
@@ -83,20 +135,29 @@ const MainLayout: React.FC = () => {
         setSidebarActiveItem('')
         setActiveLanguage('')
         setSelectedLanguageId(null)
+        setTextId(undefined) // YANGI: Text ID ni tozalash
         navigate('/')
     }
 
     const handleEditorClick = () => {
         setShowChatInput(true)
         setShowContentMenu(false)
+        setSidebarActiveItem('')
+        setTextId(undefined) // YANGI: Text ID ni tozalash
         navigate('/editor')
     }
 
-    // YANGI: languageId ni ChatInput ga uzatish
+    // YANGI: Save qilinganda sidebar ni yangilash funksiyasi
+    const handleSendMessage = (message: string) => {
+        console.log('Message sent, refreshing sidebar...', message)
+        // Bu yerda Sidebar ni yangilash kerak
+        // Agar Sidebar komponenti ichida useEffect qilsa, uni trigger qilish uchun
+        // refreshTrigger prop'ini o'zgartirishimiz kerak
+    }
+
     const getCurrentTags = (): Tag[] => {
         const currentLinguistic = linguistics[activeTab]
         if (!currentLinguistic) {
-            console.log('No current linguistic for tab:', activeTab)
             return []
         }
 
@@ -104,11 +165,8 @@ const MainLayout: React.FC = () => {
             const filteredTags = currentLinguistic.tags.filter(
                 (tag) => tag.language.name === activeLanguage
             )
-            console.log('Filtered tags:', filteredTags)
             return filteredTags
         }
-
-        console.log('All tags:', currentLinguistic.tags)
         return currentLinguistic.tags
     }
 
@@ -246,8 +304,6 @@ const MainLayout: React.FC = () => {
             return <div className='loading'>Loading content...</div>
         }
 
-        console.log('Rendering content for language:', activeLanguage)
-
         switch (activeLanguage) {
             case 'Ingiliz tili':
                 return renderEnglishContent()
@@ -267,20 +323,22 @@ const MainLayout: React.FC = () => {
 
     return (
         <div className='main-layout'>
+            {/* YANGI: Sidebar'ga onTextClick prop'ini qo'shdik */}
             <Sidebar
                 activeItem={sidebarActiveItem}
                 onItemClick={handleSidebarItemClick}
+                onTextClick={handleTextItemClick} // YANGI: Text click handler
                 onEditorClick={handleEditorClick}
                 onCloseLanguage={handleCloseLanguage}
                 activeTab={activeTab}
             />
 
             <div className='main-content'>
-                {/* YANGI: Faqat mavjud prop larni uzatamiz */}
                 <Topbar
                     activeTab={activeTab}
                     onTabChange={handleTabChange}
-                    // onAnalysisTypeSelect va selectedAnalysisType ni OLIB TASHLAYMIZ
+                    onAnalysisTypeSelect={handleAnalysisTypeSelect}
+                    selectedAnalysisType={selectedAnalysisType}
                 />
 
                 <div className='content-area'>
@@ -292,22 +350,19 @@ const MainLayout: React.FC = () => {
 
                     {showChatInput && (
                         <div className='main-content-wrapper'>
-                            {/* 80% ChatInput */}
                             <div className='chat-input-section'>
-                                {/* YANGI: analysisType ni ChatInput ga uzatish */}
+                                {/* YANGI: textId ni ChatInput ga uzatdik */}
                                 <ChatInput
-                                    onSendMessage={(message) =>
-                                        console.log(message)
-                                    }
+                                    onSendMessage={handleSendMessage}
                                     languageId={selectedLanguageId || undefined}
                                     analysisType={selectedAnalysisType}
                                     onStatisticsUpdate={(stats) => {
                                         setTagStats(stats)
                                     }}
+                                    textId={textId} // YANGI: Text ID ni uzatish
                                 />
                             </div>
 
-                            {/* 20% Statistics */}
                             <div className='statistics-section'>
                                 <TagStatistics stats={tagStats} />
                             </div>
