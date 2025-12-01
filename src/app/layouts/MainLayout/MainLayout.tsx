@@ -63,12 +63,15 @@ const MainLayout: React.FC = () => {
                 return
             }
 
-            const response = await fetch(`/api/tagged_texts/${textId}/`, {
-                headers: {
-                    Authorization: `Bearer ${authToken}`,
-                    Accept: 'application/json',
-                },
-            })
+            const response = await fetch(
+                `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/${textId}/`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${authToken}`,
+                        Accept: 'application/json',
+                    },
+                }
+            )
 
             if (response.ok) {
                 const textData = await response.json()
