@@ -26,7 +26,7 @@ interface TaggedText {
     title: string
     file: string | null
     text: string
-    metadata: Record<string, any>
+    metadata: Record<string, unknown> // any -> unknown
 }
 
 // YANGI: API response formati
@@ -49,6 +49,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const [userTexts, setUserTexts] = useState<TaggedText[]>([])
     const [loading, setLoading] = useState(true)
     const [textsLoading, setTextsLoading] = useState(true)
+    const [defaultLanguageId, setDefaultLanguageId] = useState<string>('')
 
     useEffect(() => {
         const loadData = async () => {
@@ -56,6 +57,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setLoading(true)
                 const data = await linguisticsApi.getLinguistics()
                 setLinguistics(data)
+
+                // Birinchi tilni topish va active qilish
+                if (data.length > 0) {
+                    const firstLinguistic = data[0]
+                    const languages =
+                        getLanguagesFromFirstLinguistic(firstLinguistic)
+                    if (languages.length > 0) {
+                        const firstLanguage = languages[0]
+                        setDefaultLanguageId(firstLanguage.id.toString())
+                        // Parent componentga birinchi tilni active qilish uchun signal yuborish
+                        if (onItemClick) {
+                            onItemClick(firstLanguage.name, firstLanguage.id)
+                        }
+                    }
+                }
             } catch (error) {
                 console.error('Failed to load linguistics:', error)
             } finally {
@@ -65,6 +81,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         loadData()
     }, [])
+
+    // Birinchi linguistic ma'lumotlaridan tillarni olish
+    const getLanguagesFromFirstLinguistic = (
+        linguistic: LinguisticsData
+    ): Language[] => {
+        if (!linguistic) return []
+
+        if (linguistic.languages && linguistic.languages.length > 0) {
+            return linguistic.languages
+        }
+
+        const uniqueLanguages: Language[] = []
+        const languageMap = new Map<number, Language>()
+
+        linguistic.tags.forEach((tag) => {
+            if (!languageMap.has(tag.language.id)) {
+                languageMap.set(tag.language.id, tag.language)
+                uniqueLanguages.push(tag.language)
+            }
+        })
+
+        return uniqueLanguages
+    }
 
     // YANGI: To'g'ri API dan foydalanish
     useEffect(() => {
@@ -160,18 +199,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
 
     const languages = getLanguagesFromTags()
-    const languageItems = languages.map((lang) => ({
-        id: lang.id.toString(),
-        text: lang.name,
-        languageId: lang.id,
-    }))
 
-    // User textlarini sidebar item formatiga o'tkazish
-    const userTextItems = userTexts.map((text) => ({
-        id: text.id.toString(),
-        text: text.title,
-        textId: text.id,
-    }))
+    // Agar activeItem bo'sh bo'lsa, birinchi tilni active qilish
+    const activeLanguageId = activeItem || defaultLanguageId
 
     const sectionTitle = currentLinguistic?.name || 'Loading...'
 
@@ -195,9 +225,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             text: lang.name,
                             languageId: lang.id,
                         }))}
-                        activeItem={activeItem}
+                        activeItem={activeLanguageId}
                         onItemClick={onItemClick}
-                        showDelete={!!activeItem}
+                        showDelete={!!activeLanguageId}
                         onCloseLanguage={onCloseLanguage}
                     />
                 )}
@@ -209,7 +239,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         text: text.title,
                         textId: text.id,
                     }))}
-                    activeItem={activeItem}
+                    activeItem={activeLanguageId}
                     onTextClick={onTextClick}
                     showDelete={false}
                     isLoading={textsLoading}

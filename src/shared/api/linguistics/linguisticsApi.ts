@@ -119,12 +119,12 @@ class LinguisticsApi {
         return this.client.post<TaggedText>('/tagged_texts/', data)
     }
 
-    async updateTaggedText(
-        id: number,
-        data: UpdateTaggedTextRequest
-    ): Promise<TaggedText> {
-        return this.client.patch<TaggedText>(`/tagged_texts/${id}/`, data)
-    }
+    // async updateTaggedText(
+    //     id: number,
+    //     data: UpdateTaggedTextRequest
+    // ): Promise<TaggedText> {
+    //     return this.client.patch<TaggedText>(`/tagged_texts/${id}/`, data)
+    // }
 
     // YANGI: Annotation API lar
     async createAnnotation(data: CreateAnnotationRequest): Promise<Annotation> {

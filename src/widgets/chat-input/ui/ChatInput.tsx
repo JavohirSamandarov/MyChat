@@ -751,7 +751,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             console.log('Sending data to backend:', requestData)
 
             // API request
-            const response = await fetch('/api/tagged_texts/', {
+            const response = await fetch('/tagged_texts/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
