@@ -1,5 +1,5 @@
 import React from 'react'
-import './TagStatistics.css'
+import './Tagstatistics.css'
 
 interface TagStat {
     count: number
