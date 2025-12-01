@@ -118,12 +118,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     return
                 }
 
-                const response = await fetch('/api/tagged_texts/', {
-                    headers: {
-                        Authorization: `Bearer ${authToken}`,
-                        Accept: 'application/json',
-                    },
-                })
+                const response = await fetch(
+                    `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/`,
+                    {
+                        headers: {
+                            Authorization: `Bearer ${authToken}`,
+                            Accept: 'application/json',
+                        },
+                    }
+                )
 
                 if (response.ok) {
                     const data: TaggedTextsResponse = await response.json()
