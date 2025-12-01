@@ -1,1 +1,1 @@
-export { TagStatistics } from './tagstatistics'
+export { TagStatistics } from './Tagstatistics'
