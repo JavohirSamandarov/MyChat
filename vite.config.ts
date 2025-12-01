@@ -20,21 +20,21 @@ export default ({ mode }) => {
         server: {
             host: true,
             port: 5173,
-            // proxy: {
-            //   '/api': {
-            //     target: env.VITE_API_URL, // use env variable here
-            //     changeOrigin: true,
-            //     secure: false,
-            //     rewrite: (path) => path,
-            //   },
-            // },
             proxy: {
                 '/api': {
-                    target: 'https://api.tilshunoslik.uz', // Hardcode
+                    target: env.VITE_API_URL, // use env variable here
                     changeOrigin: true,
                     secure: false,
+                    rewrite: (path) => path,
                 },
             },
+            // proxy: {
+            //     '/api': {
+            //         target: 'https://api.tilshunoslik.uz', // Hardcode
+            //         changeOrigin: true,
+            //         secure: false,
+            //     },
+            // },
         },
     })
 }
