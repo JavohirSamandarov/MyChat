@@ -93,7 +93,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     }
 
                     const response = await fetch(
-                        `/api/tagged_texts/${textId}/`,
+                        `${
+                            import.meta.env.VITE_API_BASE_URL
+                        }/tagged_texts/${textId}/`,
                         {
                             headers: {
                                 Authorization: `Bearer ${authToken}`,
