@@ -240,6 +240,17 @@ const MainLayout: React.FC = () => {
         navigate('/editor')
     }
 
+    const handleTextDeleted = (deletedId: number) => {
+        if (textId === deletedId) {
+            setTextId(undefined)
+            setShowChatInput(true)
+            setShowContentMenu(false)
+            setTagStats({})
+        }
+        setSidebarRefreshKey((prev) => prev + 1)
+        setShouldAutoSelectLanguage(false)
+    }
+
     // YANGI: Save qilinganda sidebar ni yangilash funksiyasi
     const handleSendMessage = (message: string) => {
         console.log('Message sent, refreshing sidebar...', message)
@@ -414,6 +425,19 @@ const MainLayout: React.FC = () => {
         }
     }
 
+    const resetToDefaultState = useCallback(() => {
+        setActiveTab(0)
+        setActiveLanguage('')
+        setActiveLanguageId('')
+        setSelectedLanguageId(null)
+        setTextId(undefined)
+        setShowChatInput(true)
+        setShowContentMenu(false)
+        setShouldAutoSelectLanguage(true)
+        setTagStats({})
+        navigate('/')
+    }, [navigate])
+
     const handleTextSaved = (
         savedText: {
             id: number
@@ -427,7 +451,7 @@ const MainLayout: React.FC = () => {
         setShowContentMenu(false)
         setShouldAutoSelectLanguage(false)
 
-        if (savedText.language) {
+        if (savedText.language && !context.isUpdate) {
             setSelectedLanguageId(savedText.language)
             const matchedLanguage = findLanguageById(savedText.language)
             if (matchedLanguage) {
@@ -437,7 +461,7 @@ const MainLayout: React.FC = () => {
         }
 
         if (context.isUpdate) {
-            setTextId(savedText.id)
+            resetToDefaultState()
         } else {
             setTextId(undefined)
         }
@@ -456,6 +480,7 @@ const MainLayout: React.FC = () => {
                 onCloseLanguage={handleCloseLanguage}
                 activeTab={activeTab}
                 refreshKey={sidebarRefreshKey}
+                onTextDeleted={handleTextDeleted}
             />
 
             <div className='main-content'>

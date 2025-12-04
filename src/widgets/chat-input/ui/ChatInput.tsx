@@ -314,13 +314,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             tagAbbreviations.forEach((tagAbbr) => {
                 if (tagAbbr.trim()) {
                     if (!newStats[tagAbbr]) {
+                        const existingColor =
+                            latestStatsRef.current[tagAbbr]?.color
                         const tagInfo =
                             tagSource.find(
                                 (t) => t.abbreviation === tagAbbr
                             ) || findTagByAbbreviation(tagAbbr)
                         newStats[tagAbbr] = {
                             count: 0,
-                            color: tagInfo?.color || '#e3f2fd',
+                            color:
+                                existingColor ||
+                                tagInfo?.color ||
+                                '#e3f2fd',
                         }
                     }
                     newStats[tagAbbr].count++
@@ -505,10 +510,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         console.log(
                             'Text loaded successfully:',
                             textData.title
-                        )
-                        showNotification(
-                            `"${textData.title}" loaded`,
-                            'success'
                         )
                     } else {
                         throw new Error('Failed to load text')

@@ -18,6 +18,7 @@ interface SidebarProps {
     onCloseLanguage?: () => void
     activeTab?: number
     refreshKey?: number
+    onTextDeleted?: (textId: number) => void
 }
 
 // YANGI: TaggedText interfeysi
@@ -50,12 +51,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onCloseLanguage = () => {},
     activeTab = 0,
     refreshKey = 0,
+    onTextDeleted = () => {},
 }) => {
     const [linguistics, setLinguistics] = useState<LinguisticsData[]>([])
     const [userTexts, setUserTexts] = useState<TaggedText[]>([])
     const [loading, setLoading] = useState(true)
     const [textsLoading, setTextsLoading] = useState(true)
     const [defaultLanguageId, setDefaultLanguageId] = useState<string>('')
+    const [pendingDelete, setPendingDelete] = useState<{
+        id: number
+        title: string
+    } | null>(null)
 
     useEffect(() => {
         const loadData = async () => {
@@ -185,6 +191,58 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
     }
 
+    const handleTextDelete = (textId: number) => {
+        const targetText = userTexts.find((text) => text.id === textId)
+        setPendingDelete({
+            id: textId,
+            title: targetText?.title || 'this text',
+        })
+    }
+
+    const confirmDeleteText = async () => {
+        if (!pendingDelete) return
+
+        const authToken = getAuthToken()
+        if (!authToken) {
+            console.error('Authentication required for deleting text')
+            setPendingDelete(null)
+            return
+        }
+
+        try {
+            const response = await fetch(
+                `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/${pendingDelete.id}/`,
+                {
+                    method: 'DELETE',
+                    headers: {
+                        Authorization: `Bearer ${authToken}`,
+                        Accept: 'application/json',
+                    },
+                }
+            )
+
+            if (!response.ok && response.status !== 204) {
+                throw new Error('Failed to delete text')
+            }
+
+            setUserTexts((prev) =>
+                prev.filter((textItem) => textItem.id !== pendingDelete.id)
+            )
+
+            if (activeTextId === pendingDelete.id) {
+                onTextDeleted(pendingDelete.id)
+            }
+        } catch (error) {
+            console.error('Failed to delete text:', error)
+        } finally {
+            setPendingDelete(null)
+        }
+    }
+
+    const handleCancelDelete = () => {
+        setPendingDelete(null)
+    }
+
     const currentLinguistic = linguistics[activeTab]
 
     const getLanguagesFromTags = (): Language[] => {
@@ -273,14 +331,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     activeItem={activeUserTextId}
                     activeMatchBy='id'
                     onTextClick={onTextClick}
-                    showDelete={false}
+                    showDelete={true}
                     isLoading={textsLoading}
+                    onTextDelete={handleTextDelete}
                 />
             </div>
 
             <div className='sidebar-footer'>
                 <LogoutButton />
             </div>
+
+            {pendingDelete && (
+                <div className='sidebar-modal-overlay'>
+                    <div className='sidebar-modal'>
+                        <h3>Delete annotated text?</h3>
+                        <p>
+                            Are you sure you want to remove "
+                            <strong>{pendingDelete.title}</strong>" from your
+                            texts?
+                        </p>
+                        <div className='sidebar-modal-actions'>
+                            <button
+                                className='modal-button cancel'
+                                onClick={handleCancelDelete}
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                className='modal-button delete'
+                                onClick={confirmDeleteText}
+                            >
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

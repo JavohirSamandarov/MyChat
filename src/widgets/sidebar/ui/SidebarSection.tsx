@@ -18,6 +18,7 @@ interface SidebarSectionProps {
     showDelete?: boolean
     onCloseLanguage?: () => void
     isLoading?: boolean
+    onTextDelete?: (textId: number) => void
 }
 
 export const SidebarSection: React.FC<SidebarSectionProps> = ({
@@ -30,6 +31,7 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
     showDelete = false,
     onCloseLanguage = () => {},
     isLoading = false,
+    onTextDelete = () => {},
 }) => {
     const getComparisonValue = (item: SidebarItemType) =>
         activeMatchBy === 'id' ? item.id : item.text
@@ -45,6 +47,18 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                         const isCurrentItemActive =
                             activeItem !== undefined &&
                             activeItem === getComparisonValue(item)
+                        const isTextItem = !!item.textId
+                        const canCloseLanguage =
+                            !isTextItem &&
+                            showDelete &&
+                            isCurrentItemActive
+                        const handleItemDelete = () => {
+                            if (isTextItem && item.textId) {
+                                onTextDelete(item.textId)
+                            } else {
+                                onCloseLanguage()
+                            }
+                        }
 
                         return (
                             <SidebarItem
@@ -58,8 +72,8 @@ export const SidebarSection: React.FC<SidebarSectionProps> = ({
                                         onItemClick(item.text, item.languageId)
                                     }
                                 }}
-                                showDelete={showDelete && isCurrentItemActive}
-                                onDelete={onCloseLanguage}
+                                showDelete={isTextItem || canCloseLanguage}
+                                onDelete={handleItemDelete}
                                 textId={item.textId}
                             />
                         )

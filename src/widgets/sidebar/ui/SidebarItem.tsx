@@ -1,4 +1,5 @@
 import React from 'react'
+import DeleteOutlinedIcon from '@mui/icons-material/DeleteOutlined'
 
 interface SidebarItemProps {
     text: string
@@ -24,6 +25,34 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
 
     const isTextItem = !!textId
 
+    const renderActionButton = () => {
+        if (isTextItem) {
+            return (
+                <button
+                    className='sidebar-item-action delete'
+                    onClick={handleDeleteClick}
+                    title='Delete text'
+                >
+                    <DeleteOutlinedIcon fontSize='small' />
+                </button>
+            )
+        }
+
+        if (showDelete) {
+            return (
+                <button
+                    className='sidebar-item-action close'
+                    onClick={handleDeleteClick}
+                    title='Close'
+                >
+                    ×
+                </button>
+            )
+        }
+
+        return null
+    }
+
     return (
         <li
             className={`sidebar-item ${isActive ? 'active' : ''} ${
@@ -31,37 +60,9 @@ export const SidebarItem: React.FC<SidebarItemProps> = ({
             }`}
             onClick={onClick}
         >
-            {isTextItem && <span className='sidebar-item-icon'>📄</span>}
+            {isTextItem && <span className='sidebar-item-icon'>dY",</span>}
             <span className='sidebar-item-text'>{text}</span>
-            {showDelete && (
-                <button
-                    className='sidebar-item-delete'
-                    onClick={handleDeleteClick}
-                >
-                    <svg
-                        width='16'
-                        height='16'
-                        viewBox='0 0 24 24'
-                        fill='none'
-                        xmlns='http://www.w3.org/2000/svg'
-                    >
-                        <path
-                            d='M18 6L6 18'
-                            stroke='currentColor'
-                            strokeWidth='2'
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                        />
-                        <path
-                            d='M6 6L18 18'
-                            stroke='currentColor'
-                            strokeWidth='2'
-                            strokeLinecap='round'
-                            strokeLinejoin='round'
-                        />
-                    </svg>
-                </button>
-            )}
+            {renderActionButton()}
         </li>
     )
 }
