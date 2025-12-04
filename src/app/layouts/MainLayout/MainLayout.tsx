@@ -1,17 +1,42 @@
 import { ChatInput, Sidebar, Topbar } from '@/widgets'
 import './MainLayout.css'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     linguisticsApi,
     LinguisticsData,
     Tag,
+    Language,
 } from '@/shared/api/linguistics/linguisticsApi'
 import { TagStatistics } from '@/widgets/tagstatistics'
 
+const DEFAULT_ANALYSIS_TYPE = 1
+
+const getLanguagesForLinguistic = (
+    linguistic?: LinguisticsData
+): Language[] => {
+    if (!linguistic) return []
+
+    if (linguistic.languages && linguistic.languages.length > 0) {
+        return linguistic.languages
+    }
+
+    const uniqueLanguages: Language[] = []
+    const languageMap = new Map<number, Language>()
+
+    linguistic.tags.forEach((tag) => {
+        if (!languageMap.has(tag.language.id)) {
+            languageMap.set(tag.language.id, tag.language)
+            uniqueLanguages.push(tag.language)
+        }
+    })
+
+    return uniqueLanguages
+}
+
 const MainLayout: React.FC = () => {
     const [activeTab, setActiveTab] = useState<number>(0)
-    const [sidebarActiveItem, setSidebarActiveItem] = useState<string>('')
+    const [activeLanguageId, setActiveLanguageId] = useState<string>('')
     const [showChatInput, setShowChatInput] = useState<boolean>(true)
     const [showContentMenu, setShowContentMenu] = useState<boolean>(false)
     const [activeLanguage, setActiveLanguage] = useState<string>('')
@@ -21,14 +46,56 @@ const MainLayout: React.FC = () => {
         null
     )
     // YANGI: Analysis type state
-    const [selectedAnalysisType, setSelectedAnalysisType] = useState<number>(1)
+    const [selectedAnalysisType, setSelectedAnalysisType] =
+        useState<number>(DEFAULT_ANALYSIS_TYPE)
     const [tagStats, setTagStats] = useState<
         Record<string, { count: number; color: string }>
     >({})
     // YANGI: Text ID state
     const [textId, setTextId] = useState<number | undefined>(undefined)
+    const [sidebarRefreshKey, setSidebarRefreshKey] = useState<number>(0)
+    const [shouldAutoSelectLanguage, setShouldAutoSelectLanguage] =
+        useState<boolean>(true)
 
     const navigate = useNavigate()
+
+    const findLanguageById = useCallback(
+        (languageId: number): Language | undefined => {
+            for (const linguistic of linguistics) {
+                const languages = getLanguagesForLinguistic(linguistic)
+                const match = languages.find((lang) => lang.id === languageId)
+                if (match) {
+                    return match
+                }
+            }
+            return undefined
+        },
+        [linguistics]
+    )
+
+    const applyDefaultLanguageForTab = useCallback(
+        (tabIndex: number) => {
+            const currentLinguistic = linguistics[tabIndex]
+            const languages = getLanguagesForLinguistic(currentLinguistic)
+
+            if (!languages.length) {
+                setActiveLanguage('')
+                setActiveLanguageId('')
+                setSelectedLanguageId(null)
+                setShowContentMenu(false)
+                return
+            }
+
+            const firstLanguage = languages[0]
+            setActiveLanguage(firstLanguage.name)
+            setActiveLanguageId(firstLanguage.id.toString())
+            setSelectedLanguageId(firstLanguage.id)
+            setShowChatInput(false)
+            setShowContentMenu(true)
+            navigate(`/tags?language=${encodeURIComponent(firstLanguage.name)}`)
+        },
+        [linguistics, navigate]
+    )
 
     useEffect(() => {
         const loadData = async () => {
@@ -36,6 +103,11 @@ const MainLayout: React.FC = () => {
                 setLoading(true)
                 const data = await linguisticsApi.getLinguistics()
                 setLinguistics(data)
+                if (data.length > 0) {
+                    setSelectedAnalysisType(data[0].id)
+                } else {
+                    setSelectedAnalysisType(DEFAULT_ANALYSIS_TYPE)
+                }
             } catch (error) {
                 console.error('Failed to load linguistics:', error)
             } finally {
@@ -46,13 +118,30 @@ const MainLayout: React.FC = () => {
         loadData()
     }, [])
 
+    useEffect(() => {
+        if (
+            !shouldAutoSelectLanguage ||
+            !linguistics.length ||
+            !linguistics[activeTab]
+        ) {
+            return
+        }
+        applyDefaultLanguageForTab(activeTab)
+        setShouldAutoSelectLanguage(false)
+    }, [
+        shouldAutoSelectLanguage,
+        linguistics,
+        activeTab,
+        applyDefaultLanguageForTab,
+    ])
+
     const handleTextItemClick = async (textId: number, textTitle: string) => {
         // Text ID ni saqlash
         setTextId(textId)
-        setSidebarActiveItem(textTitle)
         setShowChatInput(true)
         setShowContentMenu(false)
         setSelectedLanguageId(null) // Avval tozalash
+        setShouldAutoSelectLanguage(false)
 
         // Text ma'lumotlarini yuklash
         try {
@@ -80,16 +169,12 @@ const MainLayout: React.FC = () => {
                 if (textData.language) {
                     // Tilni avtomatik tanlash
                     setSelectedLanguageId(textData.language)
-
-                    // O'sha tilni sidebar'dan ham aktiv qilish
-                    const currentLinguistic = linguistics[activeTab]
-                    if (currentLinguistic?.languages) {
-                        const language = currentLinguistic.languages.find(
-                            (lang) => lang.id === textData.language
-                        )
-                        if (language) {
-                            console.log('Found language:', language.name)
-                        }
+                    const matchedLanguage = findLanguageById(textData.language)
+                    if (matchedLanguage) {
+                        setActiveLanguageId(matchedLanguage.id.toString())
+                        setActiveLanguage(matchedLanguage.name)
+                    } else {
+                        setActiveLanguageId(textData.language.toString())
                     }
                 }
             }
@@ -103,13 +188,16 @@ const MainLayout: React.FC = () => {
     const handleTabChange = (tabIndex: number) => {
         console.log('Tab changed to:', tabIndex)
         setActiveTab(tabIndex)
-        setSidebarActiveItem('')
-        setShowChatInput(true)
-        setShowContentMenu(false)
+        setActiveLanguageId('')
+        setShowChatInput(false)
+        setShowContentMenu(true)
         setActiveLanguage('')
         setSelectedLanguageId(null)
         setTextId(undefined) // YANGI: Text ID ni ham tozalash
-        setSelectedAnalysisType(0)
+        setShouldAutoSelectLanguage(true)
+        const nextAnalysisId =
+            linguistics[tabIndex]?.id || DEFAULT_ANALYSIS_TYPE
+        setSelectedAnalysisType(nextAnalysisId)
 
         const linguisticId = linguistics[tabIndex]?.id
         if (linguisticId) {
@@ -122,7 +210,8 @@ const MainLayout: React.FC = () => {
     }
 
     const handleSidebarItemClick = (itemText: string, languageId?: number) => {
-        setSidebarActiveItem(itemText)
+        setShouldAutoSelectLanguage(false)
+        setActiveLanguageId(languageId ? languageId.toString() : '')
         setShowChatInput(false)
         setShowContentMenu(true)
         setActiveLanguage(itemText)
@@ -133,9 +222,10 @@ const MainLayout: React.FC = () => {
     }
 
     const handleCloseLanguage = () => {
+        setShouldAutoSelectLanguage(false)
         setShowChatInput(true)
         setShowContentMenu(false)
-        setSidebarActiveItem('')
+        setActiveLanguageId('')
         setActiveLanguage('')
         setSelectedLanguageId(null)
         setTextId(undefined) // YANGI: Text ID ni tozalash
@@ -143,9 +233,9 @@ const MainLayout: React.FC = () => {
     }
 
     const handleEditorClick = () => {
+        setShouldAutoSelectLanguage(false)
         setShowChatInput(true)
         setShowContentMenu(false)
-        setSidebarActiveItem('')
         setTextId(undefined) // YANGI: Text ID ni tozalash
         navigate('/editor')
     }
@@ -324,16 +414,48 @@ const MainLayout: React.FC = () => {
         }
     }
 
+    const handleTextSaved = (
+        savedText: {
+            id: number
+            title: string
+            language: number
+        },
+        context: { isUpdate: boolean } = { isUpdate: false }
+    ) => {
+        setSidebarRefreshKey((prev) => prev + 1)
+        setShowChatInput(true)
+        setShowContentMenu(false)
+        setShouldAutoSelectLanguage(false)
+
+        if (savedText.language) {
+            setSelectedLanguageId(savedText.language)
+            const matchedLanguage = findLanguageById(savedText.language)
+            if (matchedLanguage) {
+                setActiveLanguageId(matchedLanguage.id.toString())
+                setActiveLanguage(matchedLanguage.name)
+            }
+        }
+
+        if (context.isUpdate) {
+            setTextId(savedText.id)
+        } else {
+            setTextId(undefined)
+        }
+    }
+
     return (
         <div className='main-layout'>
             {/* YANGI: Sidebar'ga onTextClick prop'ini qo'shdik */}
             <Sidebar
-                activeItem={sidebarActiveItem}
+                activeItem={activeLanguageId}
+                activeTextId={textId}
+                activeLinguisticId={linguistics[activeTab]?.id}
                 onItemClick={handleSidebarItemClick}
                 onTextClick={handleTextItemClick} // YANGI: Text click handler
                 onEditorClick={handleEditorClick}
                 onCloseLanguage={handleCloseLanguage}
                 activeTab={activeTab}
+                refreshKey={sidebarRefreshKey}
             />
 
             <div className='main-content'>
@@ -359,10 +481,12 @@ const MainLayout: React.FC = () => {
                                     onSendMessage={handleSendMessage}
                                     languageId={selectedLanguageId || undefined}
                                     analysisType={selectedAnalysisType}
+                                    availableTags={getCurrentTags()}
                                     onStatisticsUpdate={(stats) => {
                                         setTagStats(stats)
                                     }}
                                     textId={textId} // YANGI: Text ID ni uzatish
+                                    onTextSaved={handleTextSaved}
                                 />
                             </div>
 

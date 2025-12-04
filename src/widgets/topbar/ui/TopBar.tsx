@@ -16,6 +16,8 @@ interface TopbarProps {
 export const Topbar: React.FC<TopbarProps> = ({
     activeTab = 0,
     onTabChange = () => {},
+    onAnalysisTypeSelect = () => {},
+    selectedAnalysisType,
 }) => {
     const [linguistics, setLinguistics] = useState<LinguisticsData[]>([])
     const [loading, setLoading] = useState(true)
@@ -36,8 +38,30 @@ export const Topbar: React.FC<TopbarProps> = ({
         loadLinguistics()
     }, [])
 
+    useEffect(() => {
+        if (loading) return
+        const nextTypeId = linguistics[activeTab]?.id
+        if (!nextTypeId) return
+        if (selectedAnalysisType === nextTypeId) return
+        onAnalysisTypeSelect(nextTypeId)
+    }, [
+        loading,
+        linguistics,
+        activeTab,
+        selectedAnalysisType,
+        onAnalysisTypeSelect,
+    ])
+
     // FAQAT API dan kelgan linguistics nomlari
     const tabs = linguistics.map((ling) => ling.name)
+
+    const handleTabClick = (index: number) => {
+        onTabChange(index)
+        const selected = linguistics[index]
+        if (selected) {
+            onAnalysisTypeSelect(selected.id)
+        }
+    }
 
     return (
         <div className='topbar'>
@@ -51,7 +75,7 @@ export const Topbar: React.FC<TopbarProps> = ({
                                 key={linguistics[index].id}
                                 label={tab}
                                 isActive={activeTab === index}
-                                onClick={() => onTabChange(index)}
+                                onClick={() => handleTabClick(index)}
                             />
                         ))
                     )}

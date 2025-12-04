@@ -10,11 +10,14 @@ import {
 
 interface SidebarProps {
     activeItem?: string
+    activeTextId?: number
+    activeLinguisticId?: number
     onItemClick?: (itemText: string, languageId?: number) => void
     onTextClick?: (textId: number, textTitle: string) => void
     onEditorClick?: () => void
     onCloseLanguage?: () => void
     activeTab?: number
+    refreshKey?: number
 }
 
 // YANGI: TaggedText interfeysi
@@ -39,11 +42,14 @@ interface TaggedTextsResponse {
 
 export const Sidebar: React.FC<SidebarProps> = ({
     activeItem = '',
+    activeTextId,
+    activeLinguisticId,
     onItemClick = () => {},
     onTextClick = () => {},
     onEditorClick = () => {},
     onCloseLanguage = () => {},
     activeTab = 0,
+    refreshKey = 0,
 }) => {
     const [linguistics, setLinguistics] = useState<LinguisticsData[]>([])
     const [userTexts, setUserTexts] = useState<TaggedText[]>([])
@@ -130,7 +136,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 if (response.ok) {
                     const data: TaggedTextsResponse = await response.json()
-                    setUserTexts(data.results)
+                    const sortedTexts = [...data.results].sort(
+                        (a, b) => b.id - a.id
+                    )
+                    setUserTexts(sortedTexts)
                 } else {
                     console.error('Failed to load user texts')
                     setUserTexts([])
@@ -144,7 +153,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }
 
         loadUserTexts()
-    }, [])
+    }, [refreshKey])
 
     // YANGI: Auth token olish funksiyasi
     const getAuthToken = (): string => {
@@ -203,8 +212,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     const languages = getLanguagesFromTags()
 
-    // Agar activeItem bo'sh bo'lsa, birinchi tilni active qilish
-    const activeLanguageId = activeItem || defaultLanguageId
+    // Agar activeItem bo'sh bo'lsa va hech qanday text tanlanmagan bo'lsa, joriy tabdagi birinchi tilni active qilish
+    const fallbackLanguageId =
+        languages.length > 0 ? languages[0].id.toString() : defaultLanguageId
+    const shouldUseFallback =
+        !activeItem && !activeTextId && !!fallbackLanguageId
+    const activeLanguageItem = shouldUseFallback
+        ? fallbackLanguageId
+        : activeItem
+    const activeUserTextId = activeTextId ? activeTextId.toString() : ''
+
+    const filteredUserTexts = userTexts.filter((text) => {
+        const matchesLinguistic = activeLinguisticId
+            ? text.analysis_type === activeLinguisticId
+            : true
+        const matchesLanguage =
+            activeLanguageItem && activeLanguageItem.trim().length > 0
+                ? text.language.toString() === activeLanguageItem
+                : true
+        return matchesLinguistic && matchesLanguage
+    })
 
     const sectionTitle = currentLinguistic?.name || 'Loading...'
 
@@ -228,21 +255,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             text: lang.name,
                             languageId: lang.id,
                         }))}
-                        activeItem={activeLanguageId}
+                        activeItem={activeLanguageItem}
+                        activeMatchBy='id'
                         onItemClick={onItemClick}
-                        showDelete={!!activeLanguageId}
+                        showDelete={!!activeLanguageItem}
                         onCloseLanguage={onCloseLanguage}
                     />
                 )}
                 {/* User Texts bo'limi */}
                 <SidebarSection
                     title='Your Texts'
-                    items={userTexts.map((text) => ({
+                    items={filteredUserTexts.map((text) => ({
                         id: text.id.toString(),
                         text: text.title,
                         textId: text.id,
                     }))}
-                    activeItem={activeLanguageId}
+                    activeItem={activeUserTextId}
+                    activeMatchBy='id'
                     onTextClick={onTextClick}
                     showDelete={false}
                     isLoading={textsLoading}

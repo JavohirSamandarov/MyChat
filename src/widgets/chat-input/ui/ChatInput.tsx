@@ -12,24 +12,41 @@ import { useEditor } from '@/features/editor/hooks/useEditor'
 import { Tag } from '@/shared/api/linguistics/linguisticsApi'
 import { Alert, Snackbar } from '@mui/material'
 
+const DEFAULT_ANALYSIS_TYPE = 1
+
+interface SavedTextPayload {
+    id: number
+    title: string
+    language: number
+    analysis_type?: number
+    metadata?: unknown
+}
+
 interface ChatInputProps {
     onSendMessage?: (message: string) => void
     taggedTextId?: number
     languageId?: number
     analysisType?: number
+    availableTags?: Tag[]
     onStatisticsUpdate?: (
         stats: Record<string, { count: number; color: string }>
     ) => void
     textId?: number
+    onTextSaved?: (
+        savedText: SavedTextPayload,
+        context: { isUpdate: boolean }
+    ) => void
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
     onSendMessage = () => {},
-    taggedTextId = 1,
+    taggedTextId,
     languageId,
-    analysisType = 0,
+    analysisType = DEFAULT_ANALYSIS_TYPE,
+    availableTags,
     onStatisticsUpdate,
     textId,
+    onTextSaved = () => {},
 }) => {
     const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
     const [showTagMenu, setShowTagMenu] = useState(false)
@@ -52,13 +69,356 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const [currentSelection, setCurrentSelection] = useState<string>('')
     const [selectedAnnotatedElement, setSelectedAnnotatedElement] =
         useState<HTMLElement | null>(null)
+    const [loadedLanguageId, setLoadedLanguageId] = useState<
+        number | undefined
+    >(undefined)
+    const [importedAnalysisType, setImportedAnalysisType] = useState<
+        number | null
+    >(null)
+    const [forceCreate, setForceCreate] = useState<boolean>(false)
+    const latestStatsRef = useRef<
+        Record<string, { count: number; color: string }>
+    >({})
 
     const editorRef = useRef<HTMLDivElement>(null)
     const tagMenuRef = useRef<HTMLDivElement>(null)
     const editMenuRef = useRef<HTMLDivElement>(null)
     const importExportRef = useRef<HTMLDivElement>(null)
-    const { tags, handleTextSelect, addAnnotation, loadTags, clearSelection } =
-        useEditor()
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const {
+        tags: editorTags,
+        handleTextSelect,
+        addAnnotation,
+        loadTags,
+        clearSelection,
+    } = useEditor()
+    const resolvedTaggedTextId = taggedTextId ?? textId
+    const resolvedLanguageId = languageId ?? loadedLanguageId
+    const tagSource =
+        availableTags !== undefined ? availableTags : editorTags
+
+    const findTagByAbbreviation = useCallback(
+        (abbr: string) =>
+            tagSource.find(
+                (tag) =>
+                    tag.abbreviation?.toLowerCase() ===
+                    abbr?.toLowerCase()
+            ),
+        [tagSource]
+    )
+
+    const getTagColor = useCallback(
+        (abbr: string): string => {
+            const storedColor = latestStatsRef.current[abbr]?.color
+            if (storedColor) {
+                return storedColor
+            }
+            const tagInfo = findTagByAbbreviation(abbr)
+            return tagInfo?.color || '#e3f2fd'
+        },
+        [findTagByAbbreviation]
+    )
+
+    const applyPrimaryColor = useCallback(
+        (element: HTMLElement, fallbackAbbr?: string) => {
+            if (!element) return
+
+            if (
+                (!element.dataset.primaryColor ||
+                    !element.dataset.primaryTag) &&
+                fallbackAbbr
+            ) {
+                const color = getTagColor(fallbackAbbr)
+                element.dataset.primaryColor = color
+                element.dataset.primaryTag = fallbackAbbr
+            }
+
+            if (element.dataset.primaryColor) {
+                element.style.backgroundColor = element.dataset.primaryColor
+            }
+        },
+        [getTagColor]
+    )
+
+    const ensurePrimaryColor = useCallback(
+        (element: HTMLElement) => {
+            if (!element || !element.classList.contains('annotated-text'))
+                return
+
+            if (!element.dataset.primaryTag || !element.dataset.primaryColor) {
+                const currentText = element.textContent || ''
+                const parts = currentText.split('/')
+                if (parts.length > 1) {
+                    const firstTagAbbr = parts[1]
+                    const color = getTagColor(firstTagAbbr)
+                    element.dataset.primaryTag = firstTagAbbr
+                    element.dataset.primaryColor = color
+                }
+            }
+
+            if (element.dataset.primaryColor) {
+                element.style.backgroundColor = element.dataset.primaryColor
+            }
+        },
+        [getTagColor]
+    )
+
+    const normalizeAnnotatedElements = useCallback(() => {
+        if (!editorRef.current) return
+        const elements = editorRef.current.querySelectorAll('.annotated-text')
+        elements.forEach((el) => ensurePrimaryColor(el as HTMLElement))
+    }, [ensurePrimaryColor])
+
+    const normalizeRef = useRef(normalizeAnnotatedElements)
+    useEffect(() => {
+        normalizeRef.current = normalizeAnnotatedElements
+    }, [normalizeAnnotatedElements])
+
+    useEffect(() => {
+        setForceCreate(false)
+    }, [textId])
+
+    const serializeEditorContent = useCallback((): string => {
+        if (!editorRef.current) return ''
+
+        const parts: string[] = []
+
+        const visitNode = (node: ChildNode) => {
+            if (node.nodeType === Node.TEXT_NODE) {
+                parts.push(node.textContent || '')
+                return
+            }
+
+            if (node.nodeType === Node.ELEMENT_NODE) {
+                const element = node as HTMLElement
+                if (element.classList.contains('annotated-text')) {
+                    parts.push(element.textContent || '')
+                    return
+                }
+
+                Array.from(element.childNodes).forEach(visitNode)
+            }
+        }
+
+        Array.from(editorRef.current.childNodes).forEach(visitNode)
+
+        return parts
+            .join('')
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, (match) =>
+                match === '\n' ? '\n' : match
+            )
+    }, [])
+
+    const restoreAnnotationsFromSerialized = useCallback(
+        (serialized: string) => {
+            if (!editorRef.current) return
+
+            const fragment = document.createDocumentFragment()
+            const tokens = serialized.split(/(\s+)/)
+
+            tokens.forEach((token) => {
+                if (!token) {
+                    return
+                }
+
+                if (/^\s+$/.test(token)) {
+                    fragment.appendChild(
+                        document.createTextNode(token)
+                    )
+                    return
+                }
+
+                if (!token.includes('/')) {
+                    fragment.appendChild(
+                        document.createTextNode(
+                            token.replace(/\+/g, ' ')
+                        )
+                    )
+                    return
+                }
+
+                const parts = token.split('/')
+                const rawWord = parts[0]
+                const abbreviations = parts.slice(1).filter(Boolean)
+
+                if (!rawWord || abbreviations.length === 0) {
+                    fragment.appendChild(
+                        document.createTextNode(
+                            token.replace(/\+/g, ' ')
+                        )
+                    )
+                    return
+                }
+
+                const span = document.createElement('span')
+                span.className = 'annotated-text'
+                span.style.backgroundColor = getTagColor(
+                    abbreviations[0]
+                )
+                span.style.color = '#000'
+                span.style.padding = '2px 6px'
+                span.style.borderRadius = '4px'
+                span.style.margin = '0 2px'
+                span.style.display = 'inline-block'
+                span.style.fontSize = 'inherit'
+                span.style.fontWeight = '600'
+                span.style.cursor = 'pointer'
+                span.dataset.primaryTag = abbreviations[0]
+                const primaryColor = getTagColor(abbreviations[0])
+                span.dataset.primaryColor = primaryColor
+                span.style.backgroundColor = primaryColor
+
+                const tagTitles = abbreviations
+                    .map((abbr) => {
+                        const tagInfo = findTagByAbbreviation(abbr)
+                        return tagInfo
+                            ? `${tagInfo.name_tag} (${abbr})`
+                            : abbr
+                    })
+                    .join(', ')
+
+                span.title = tagTitles
+                span.dataset.tagAbbrs = abbreviations.join(',')
+                span.textContent = `${rawWord}/${abbreviations.join('/')}`
+                applyPrimaryColor(span, abbreviations[0])
+
+                fragment.appendChild(span)
+            })
+
+            editorRef.current.innerHTML = ''
+            editorRef.current.appendChild(fragment)
+            normalizeRef.current?.()
+        },
+        [applyPrimaryColor, findTagByAbbreviation, getTagColor]
+    )
+
+    const restoreRef = useRef(restoreAnnotationsFromSerialized)
+    useEffect(() => {
+        restoreRef.current = restoreAnnotationsFromSerialized
+    }, [restoreAnnotationsFromSerialized])
+
+    const updateTagStatistics = useCallback(() => {
+        if (!editorRef.current) return
+
+        const annotatedElements =
+            editorRef.current.querySelectorAll('.annotated-text')
+        const newStats: Record<string, { count: number; color: string }> =
+            {}
+
+        annotatedElements.forEach((element) => {
+            const currentText = element.textContent || ''
+            const parts = currentText.split('/')
+            const tagAbbreviations = parts.slice(1)
+
+            tagAbbreviations.forEach((tagAbbr) => {
+                if (tagAbbr.trim()) {
+                    if (!newStats[tagAbbr]) {
+                        const tagInfo =
+                            tagSource.find(
+                                (t) => t.abbreviation === tagAbbr
+                            ) || findTagByAbbreviation(tagAbbr)
+                        newStats[tagAbbr] = {
+                            count: 0,
+                            color: tagInfo?.color || '#e3f2fd',
+                        }
+                    }
+                    newStats[tagAbbr].count++
+                }
+            })
+        })
+
+        latestStatsRef.current = newStats
+        onStatisticsUpdate?.(newStats)
+    }, [findTagByAbbreviation, onStatisticsUpdate, tagSource])
+
+    const parseMetadata = (
+        metadata: unknown
+    ): Record<string, unknown> | null => {
+        if (!metadata) {
+            return null
+        }
+
+        let parsed: unknown = metadata
+        let depth = 0
+
+        while (typeof parsed === 'string' && depth < 3) {
+            const trimmed = parsed.trim()
+            if (
+                (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+                (trimmed.startsWith('[') && trimmed.endsWith(']'))
+            ) {
+                try {
+                    parsed = JSON.parse(trimmed)
+                } catch (error) {
+                    console.warn('Failed to parse metadata string:', error)
+                    return null
+                }
+            } else {
+                break
+            }
+            depth++
+        }
+
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            return parsed as Record<string, unknown>
+        }
+
+        return null
+    }
+
+    const getAnnotatedHtml = (metadata: unknown): string => {
+        const parsedMetadata = parseMetadata(metadata) as
+            | { annotated_html?: unknown }
+            | null
+
+        if (
+            parsedMetadata &&
+            typeof parsedMetadata.annotated_html === 'string'
+        ) {
+            return parsedMetadata.annotated_html
+        }
+        return ''
+    }
+
+    const getStoredTagStatistics = (
+        metadata: unknown
+    ): Record<string, { count: number; color: string }> | null => {
+        const parsedMetadata = parseMetadata(metadata)
+        if (!parsedMetadata) {
+            return null
+        }
+
+        if (
+            parsedMetadata.tag_statistics &&
+            typeof parsedMetadata.tag_statistics === 'object' &&
+            !Array.isArray(parsedMetadata.tag_statistics)
+        ) {
+            return parsedMetadata.tag_statistics as Record<
+                string,
+                { count: number; color: string }
+            >
+        }
+
+        const entries = Object.entries(parsedMetadata)
+        if (
+            entries.length > 0 &&
+            entries.every(
+                ([, value]) =>
+                    value &&
+                    typeof value === 'object' &&
+                    'count' in (value as Record<string, unknown>) &&
+                    'color' in (value as Record<string, unknown>)
+            )
+        ) {
+            return parsedMetadata as Record<
+                string,
+                { count: number; color: string }
+            >
+        }
+
+        return null
+    }
 
     // Show notification
     const showNotification = (
@@ -107,23 +467,49 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     if (response.ok) {
                         const textData = await response.json()
                         console.log('Text loaded:', textData)
+                        setLoadedLanguageId(textData.language)
 
-                        // Editorga textni yuklash
-                        if (editorRef.current) {
-                            // Oddiy textni yuklash (HTML emas)
-                            editorRef.current.textContent = textData.text
-                            checkContent()
-                            updateTagStatistics()
-
-                            console.log(
-                                'Text loaded successfully:',
-                                textData.title
-                            )
-                            showNotification(
-                                `"${textData.title}" loaded`,
-                                'success'
-                            )
+                        const storedStats = getStoredTagStatistics(
+                            textData.metadata
+                        )
+                        if (storedStats) {
+                            latestStatsRef.current = storedStats
+                            onStatisticsUpdate?.(storedStats)
+                        } else {
+                            latestStatsRef.current = {}
+                            onStatisticsUpdate?.({})
                         }
+
+                        const annotatedHtml = getAnnotatedHtml(
+                            textData.metadata
+                        )
+
+                        if (annotatedHtml && editorRef.current) {
+                            editorRef.current.innerHTML = annotatedHtml
+                            normalizeRef.current?.()
+                        } else if (
+                            textData.text &&
+                            textData.text.includes('/')
+                        ) {
+                            restoreRef.current?.(textData.text)
+                        } else if (editorRef.current) {
+                            editorRef.current.textContent =
+                                textData.text || ''
+                        }
+
+                        checkContent()
+                        setTimeout(() => {
+                            updateTagStatistics()
+                        }, 0)
+
+                        console.log(
+                            'Text loaded successfully:',
+                            textData.title
+                        )
+                        showNotification(
+                            `"${textData.title}" loaded`,
+                            'success'
+                        )
                     } else {
                         throw new Error('Failed to load text')
                     }
@@ -136,24 +522,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 if (editorRef.current) {
                     editorRef.current.innerHTML = ''
                     setHasContent(false)
+                    latestStatsRef.current = {}
+                    onStatisticsUpdate?.({})
                     updateTagStatistics()
                 }
+                setLoadedLanguageId(undefined)
             }
         }
 
         loadText()
     }, [textId])
 
+    useEffect(() => {
+        if (textId) {
+            setImportedAnalysisType(null)
+        }
+    }, [textId])
+
     // Teglarni yuklash
     useEffect(() => {
-        loadTags()
-    }, [loadTags])
+        if (!availableTags) {
+            loadTags()
+        }
+    }, [availableTags, loadTags])
 
     // Teglarni filterlash
-    const filteredTags = tags
+    const filteredTags = tagSource
         .filter((tag) => {
-            if (!languageId) return false
-            return tag.language.id === languageId
+            if (!resolvedLanguageId) return false
+            return tag.language.id === resolvedLanguageId
         })
         .filter(
             (tag) =>
@@ -166,41 +563,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         )
 
     // Statistikani yangilash funksiyasi
-    const updateTagStatistics = useCallback(() => {
-        if (!editorRef.current) return
-
-        const annotatedElements =
-            editorRef.current.querySelectorAll('.annotated-text')
-        const newStats: Record<string, { count: number; color: string }> = {}
-
-        annotatedElements.forEach((element) => {
-            const currentText = element.textContent || ''
-            const parts = currentText.split('/')
-            const tagAbbreviations = parts.slice(1)
-
-            tagAbbreviations.forEach((tagAbbr) => {
-                if (tagAbbr.trim()) {
-                    if (!newStats[tagAbbr]) {
-                        // Tag ma'lumotlarini topish
-                        const tagInfo = tags.find(
-                            (t) => t.abbreviation === tagAbbr
-                        )
-                        newStats[tagAbbr] = {
-                            count: 0,
-                            color: tagInfo?.color || '#e3f2fd',
-                        }
-                    }
-                    newStats[tagAbbr].count++
-                }
-            })
-        })
-
-        onStatisticsUpdate?.(newStats)
-    }, [onStatisticsUpdate, tags])
-
     // Matn tanlanganida
     const handleTextSelection = useCallback(() => {
-        if (!languageId || filteredTags.length === 0) {
+        if (!resolvedLanguageId || filteredTags.length === 0) {
             console.log(
                 'Language not selected or no tags available - menu blocked'
             )
@@ -268,11 +633,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             setShowTagMenu(true)
             setSearchTerm('')
         }
-    }, [handleTextSelect, languageId, filteredTags.length])
+    }, [handleTextSelect, resolvedLanguageId, filteredTags.length])
 
     // Annotated elementni o'chirish
     const handleRemoveTags = () => {
         if (!selectedAnnotatedElement) return
+        ensurePrimaryColor(selectedAnnotatedElement)
 
         const originalText = selectedAnnotatedElement.textContent || ''
         const words = originalText.split('/')[0]
@@ -300,6 +666,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         if (!selectedAnnotatedElement) return
 
         const elementToUpdate = selectedAnnotatedElement
+        ensurePrimaryColor(elementToUpdate)
         const parentElement = elementToUpdate.parentElement
 
         const currentText = elementToUpdate.textContent || ''
@@ -307,6 +674,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         const originalText = parts[0]
         const currentTags = parts.slice(1)
 
+        const removedTagAbbr = currentTags[tagIndex]
         const newTags = currentTags.filter((_, index) => index !== tagIndex)
 
         if (newTags.length === 0) {
@@ -325,13 +693,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             const newFormattedText = `${originalText}/${newTags.join('/')}`
             elementToUpdate.textContent = newFormattedText
 
-            const firstTagAbbr = newTags[0]
-            const firstTag = tags.find(
-                (tag) => tag.abbreviation === firstTagAbbr
-            )
-            if (firstTag) {
-                elementToUpdate.style.backgroundColor =
-                    firstTag.color || '#e3f2fd'
+            const shouldUpdatePrimary =
+                !elementToUpdate.dataset.primaryTag ||
+                elementToUpdate.dataset.primaryTag === removedTagAbbr
+            if (shouldUpdatePrimary) {
+                const nextPrimary = newTags[0]
+                applyPrimaryColor(elementToUpdate, nextPrimary)
+            } else {
+                applyPrimaryColor(elementToUpdate)
             }
 
             const newRange = document.createRange()
@@ -349,7 +718,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     // Context menu
     const handleContextMenu = (e: React.MouseEvent) => {
-        if (!languageId || filteredTags.length === 0) {
+        if (!resolvedLanguageId || filteredTags.length === 0) {
             e.preventDefault()
             return
         }
@@ -361,18 +730,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     // MouseUp handler
     const handleMouseUp = useCallback(
         (e: React.MouseEvent) => {
-            if (e.button === 2 && languageId && filteredTags.length > 0) {
+            if (e.button === 2 && resolvedLanguageId && filteredTags.length > 0) {
                 // Right-click handling
             }
         },
-        [languageId, filteredTags.length]
+        [resolvedLanguageId, filteredTags.length]
     )
 
     // Teg tanlanganida
     const handleTagSelect = async (tag: Tag) => {
-        if (!taggedTextId) return
-
-        const success = await addAnnotation(taggedTextId, tag.id)
+        let success = true
+        if (resolvedTaggedTextId) {
+            success = await addAnnotation(resolvedTaggedTextId, tag.id)
+        }
         if (success) {
             await formatSelectedText(tag)
             window.getSelection()?.removeAllRanges()
@@ -442,6 +812,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 (targetElement as Element).classList?.contains('annotated-text')
             ) {
                 const existingElement = targetElement as HTMLElement
+                ensurePrimaryColor(existingElement)
                 const currentText = existingElement.textContent || ''
                 const parts = currentText.split('/')
                 const originalText = parts[0]
@@ -451,14 +822,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
                 existingElement.textContent = newFormattedText
 
-                const firstTagAbbr = newTags[0]
-                const firstTag = tags.find(
-                    (t) => t.abbreviation === firstTagAbbr
-                )
-                if (firstTag) {
-                    existingElement.style.backgroundColor =
-                        firstTag.color || '#e3f2fd'
-                }
+                applyPrimaryColor(existingElement, newTags[0])
 
                 if (tag.id) {
                     existingElement.dataset.tagIds =
@@ -482,7 +846,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             } else {
                 const span = document.createElement('span')
                 span.className = 'annotated-text'
-                span.style.backgroundColor = tag.color || '#e3f2fd'
+                const primaryColor = tag.color || '#e3f2fd'
+                span.style.backgroundColor = primaryColor
                 span.style.color = '#000'
                 span.style.padding = '2px 6px'
                 span.style.borderRadius = '4px'
@@ -492,6 +857,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 span.style.fontWeight = '600'
                 span.style.cursor = 'pointer'
 
+                span.dataset.primaryColor = primaryColor
+                if (tag.abbreviation) {
+                    span.dataset.primaryTag = tag.abbreviation
+                }
+                applyPrimaryColor(span, tag.abbreviation || undefined)
                 if (tag.id) span.dataset.tagIds = tag.id.toString()
                 if (tag.name_tag) span.dataset.tagNames = tag.name_tag
                 if (tag.abbreviation) span.dataset.tagAbbrs = tag.abbreviation
@@ -562,6 +932,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         if (targetElement) {
             e.preventDefault()
+            ensurePrimaryColor(targetElement)
 
             const currentText = targetElement.textContent || ''
             const parts = currentText.split('/')
@@ -589,13 +960,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 targetElement.textContent = newFormattedText
 
                 if (remainingTags.length > 0) {
-                    const firstTagAbbr = remainingTags[0]
-                    const firstTag = tags.find(
-                        (tag) => tag.abbreviation === firstTagAbbr
-                    )
-                    if (firstTag) {
-                        targetElement.style.backgroundColor =
-                            firstTag.color || '#e3f2fd'
+                    const removedTagAbbr = parts[parts.length - 1]
+                    const shouldUpdatePrimary =
+                        !targetElement.dataset.primaryTag ||
+                        targetElement.dataset.primaryTag === removedTagAbbr
+                    if (shouldUpdatePrimary) {
+                        const nextPrimary = remainingTags[0]
+                        applyPrimaryColor(targetElement, nextPrimary)
+                    } else {
+                        applyPrimaryColor(targetElement)
                     }
                 }
 
@@ -630,14 +1003,185 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     // Import funksiyasi
     const handleImport = () => {
-        console.log('Import functionality')
+        if (!fileInputRef.current) return
         setShowImportExport(false)
+        fileInputRef.current.value = ''
+        fileInputRef.current.click()
+    }
+
+    const handleFileInputChange = (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        const file = event.target.files?.[0]
+        setShowImportExport(false)
+        if (!file) {
+            return
+        }
+
+        const fileName = file.name.toLowerCase()
+        if (!fileName.endsWith('.txt')) {
+            showNotification('Faqat .txt fayllarni import qilish mumkin', 'error')
+            event.target.value = ''
+            return
+        }
+
+        const reader = new FileReader()
+        reader.onload = () => {
+            try {
+                const content = reader.result?.toString() || ''
+                const trimmedContent = content.trim()
+                if (!trimmedContent.length) {
+                    throw new Error('Fayl bo\'sh')
+                }
+
+                const looksLikeJson =
+                    trimmedContent.startsWith('{') &&
+                    trimmedContent.endsWith('}')
+                let importedText = ''
+                let statsPayload: Record<string, { count: number; color: string }> =
+                    {}
+                let nextLanguage: number | undefined
+                let nextAnalysisType: number | null = null
+                let parsed: unknown = null
+
+                if (looksLikeJson) {
+                    try {
+                        parsed = JSON.parse(trimmedContent)
+                    } catch (parseError) {
+                        console.warn('JSON import parse error:', parseError)
+                        parsed = null
+                    }
+                } else {
+                    parsed = null
+                }
+
+                if (
+                    parsed &&
+                    typeof parsed === 'object' &&
+                    parsed !== null &&
+                    'text' in parsed &&
+                    typeof (parsed as { text: unknown }).text === 'string'
+                ) {
+                    const payload = parsed as {
+                        text: string
+                        language?: number
+                        analysis_type?: number
+                        metadata?: unknown
+                    }
+                    importedText = payload.text
+                    if (typeof payload.language === 'number') {
+                        nextLanguage = payload.language
+                    }
+                    if (typeof payload.analysis_type === 'number') {
+                        nextAnalysisType = payload.analysis_type
+                    }
+                    const extractedStats =
+                        getStoredTagStatistics(payload.metadata) ||
+                        getStoredTagStatistics(payload)
+                    if (extractedStats) {
+                        statsPayload = extractedStats
+                    }
+                } else {
+                    importedText = trimmedContent
+                    statsPayload = {}
+                }
+
+                if (!importedText.trim().length) {
+                    throw new Error('Faylda teglangan matn topilmadi')
+                }
+
+                if (typeof nextLanguage === 'number') {
+                    setLoadedLanguageId(nextLanguage)
+                }
+
+                if (nextAnalysisType && nextAnalysisType > 0) {
+                    setImportedAnalysisType(nextAnalysisType)
+                } else {
+                    setImportedAnalysisType(null)
+                }
+
+                latestStatsRef.current = statsPayload
+                if (Object.keys(statsPayload).length) {
+                    onStatisticsUpdate?.(statsPayload)
+                } else {
+                    onStatisticsUpdate?.({})
+                }
+
+                restoreAnnotationsFromSerialized(importedText)
+                checkContent()
+                setTimeout(() => {
+                    updateTagStatistics()
+                }, 0)
+                if (textId) {
+                    setForceCreate(true)
+                }
+
+                showNotification('Fayl muvaffaqiyatli import qilindi')
+            } catch (error) {
+                console.error('Import error:', error)
+                showNotification(
+                    error instanceof Error
+                        ? error.message
+                        : 'Faylni import qilib bo\'lmadi',
+                    'error'
+                )
+            } finally {
+                event.target.value = ''
+            }
+        }
+
+        reader.onerror = () => {
+            console.error('Failed to read file')
+            showNotification('Faylni o\'qib bo\'lmadi', 'error')
+            event.target.value = ''
+        }
+
+        reader.readAsText(file)
     }
 
     // Export funksiyasi
     const handleExport = () => {
-        console.log('Export functionality')
+        if (!editorRef.current || !editorRef.current.innerText.trim()) {
+            showNotification('Eksport qilish uchun matn yo\'q', 'error')
+            setShowImportExport(false)
+            return
+        }
+
+        const serializedText = serializeEditorContent()
+        if (!serializedText.trim()) {
+            showNotification('Eksport qilish uchun matn topilmadi', 'error')
+            setShowImportExport(false)
+            return
+        }
+
+        const plainText = editorRef.current.innerText.trim()
+        const derivedTitle = plainText.slice(0, 50) || 'Tegs'
+        const fileTitle =
+            derivedTitle.length > 20 ? 'Tegs' : derivedTitle || 'Tegs'
+        const sanitizedName = fileTitle
+            .replace(/[<>:"/\\|?*]/g, '')
+            .trim()
+        const fileName =
+            sanitizedName.length > 0
+                ? sanitizedName
+                : derivedTitle.length > 20
+                ? 'Tegs'
+                : 'annotation'
+
+        const blob = new Blob([serializedText], {
+            type: 'text/plain;charset=utf-8',
+        })
+        const fileUrl = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = fileUrl
+        const normalizedDownloadName = fileName.replace(/\s+/g, '_')
+        document.body.appendChild(link)
+        link.download = `${normalizedDownloadName || 'Tegs'}.txt`
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(fileUrl)
         setShowImportExport(false)
+        showNotification('Teglangan matn eksport qilindi')
     }
 
     // Send funksiyasi
@@ -645,13 +1189,35 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         if (!editorRef.current?.innerHTML.trim() || isSaving) return
 
         setIsSaving(true)
+        const isUpdate = Boolean(textId) && !forceCreate
         try {
-            const success = await sendToBackend(editorRef.current.innerHTML)
-            if (success) {
-                showNotification('Text successfully saved!', 'success')
+            const savedText = await sendToBackend(
+                editorRef.current.innerHTML,
+                isUpdate
+            )
+            if (savedText) {
+                showNotification(
+                    isUpdate
+                        ? 'Text successfully updated!'
+                        : 'Text successfully saved!',
+                    'success'
+                )
                 onSendMessage(editorRef.current.innerHTML)
-            } else {
-                showNotification('Failed to save text', 'error')
+                onTextSaved(savedText, { isUpdate })
+                setLoadedLanguageId(savedText.language)
+                setForceCreate(false)
+                if (!isUpdate && editorRef.current) {
+                    editorRef.current.innerHTML = ''
+                    setHasContent(false)
+                    setSelectedRange(null)
+                    setSelectedAnnotatedElement(null)
+                    setCurrentSelection('')
+                    setShowTagMenu(false)
+                    setShowEditMenu(false)
+                    window.getSelection()?.removeAllRanges()
+                    updateTagStatistics()
+                    setImportedAnalysisType(null)
+                }
             }
         } catch (error) {
             console.error('Error sending to backend:', error)
@@ -662,8 +1228,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     // Backend ga yuborish funksiyasi
-    const sendToBackend = async (htmlContent: string): Promise<boolean> => {
+    const sendToBackend = async (
+        htmlContent: string,
+        isUpdate: boolean
+    ): Promise<SavedTextPayload | null> => {
         try {
+            const effectiveAnalysisType =
+                importedAnalysisType && importedAnalysisType > 0
+                    ? importedAnalysisType
+                    : analysisType && analysisType > 0
+                    ? analysisType
+                    : DEFAULT_ANALYSIS_TYPE
+            const finalLanguageId = resolvedLanguageId
+
             // Auth token ni tekshirish
             const authToken = getAuthToken()
             if (!authToken) {
@@ -671,7 +1248,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     'Authentication required. Please login.',
                     'error'
                 )
-                return false
+                return null
             }
 
             // User ID ni olish
@@ -681,20 +1258,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     'User information not found. Please login again.',
                     'error'
                 )
-                return false
+                return null
             }
 
             // Language ID tekshirish
-            if (!languageId) {
+            if (!finalLanguageId) {
                 showNotification('Please select a language first.', 'error')
-                return false
+                return null
             }
+
+            // Annotated textni saqlash uchun serialize
+            const serializedText = serializeEditorContent()
 
             // HTML dan plain text olish
             const tempDiv = document.createElement('div')
             tempDiv.innerHTML = htmlContent
-
-            // Annotated textlarni to'g'ri formatda olish
             const annotatedElements =
                 tempDiv.querySelectorAll('.annotated-text')
             annotatedElements.forEach((element) => {
@@ -710,7 +1288,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             // Matn bo'sh bo'lsa
             if (plainText.trim().length === 0) {
                 showNotification('Text cannot be empty.', 'error')
-                return false
+                return null
             }
 
             // Title ni tayyorlash (max 50 harf)
@@ -723,40 +1301,32 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 }
             }
 
-            // Metadata ni tayyorlash
-            const words = cleanText
-                .split(/\s+/)
-                .filter((word) => word.length > 0)
-            const metadata = {
-                created_at: new Date().toISOString(),
-                character_count: cleanText.length,
-                word_count: words.length,
-                source: 'web_editor',
-                annotated_elements_count: annotatedElements.length,
-                language_id: languageId,
-                analysis_type_id: analysisType,
-                user_id: userId,
-                version: '1.0',
-            }
+            const metadataPayload =
+                Object.keys(latestStatsRef.current).length > 0
+                    ? latestStatsRef.current
+                    : {}
 
             // API ga yuboriladigan ma'lumotlar
             const requestData = {
-                analysis_type: analysisType,
+                analysis_type: effectiveAnalysisType,
                 user: userId,
-                language: languageId,
+                language: finalLanguageId,
                 title: title,
-                // file: null,
-                text: cleanText,
-                metadata: JSON.stringify(metadata),
+                text:
+                    serializedText.trim().length > 0
+                        ? serializedText
+                        : cleanText,
+                metadata: JSON.stringify(metadataPayload),
             }
 
             console.log('Sending data to backend:', requestData)
 
             // API request
+            const endpoint = isUpdate && textId ? `${textId}/` : ''
             const response = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/`,
+                `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/${endpoint}`,
                 {
-                    method: 'POST',
+                    method: isUpdate ? 'PATCH' : 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         Accept: 'application/json',
@@ -771,14 +1341,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const result = await response.json()
                 console.log('Text saved successfully:', result)
 
-                // Muvaffaqiyatli saqlanganidan keyin editorni tozalash
-                if (editorRef.current) {
-                    editorRef.current.innerHTML = ''
-                    setHasContent(false)
-                    updateTagStatistics()
+                return {
+                    id: result.id,
+                    title: result.title,
+                    language: result.language,
+                    metadata: result.metadata,
                 }
-
-                return true
             } else {
                 // Xato handling
                 const errorText = await response.text()
@@ -816,7 +1384,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 }
 
                 showNotification(errorMessage, 'error')
-                return false
+                return null
             }
         } catch (error) {
             // Network yoki boshqa xatolar
@@ -833,7 +1401,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             }
 
             showNotification(errorMessage, 'error')
-            return false
+            return null
         }
     }
 
@@ -965,7 +1533,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             if (
                 event.ctrlKey &&
                 event.key === ' ' &&
-                languageId &&
+                resolvedLanguageId &&
                 filteredTags.length > 0
             ) {
                 event.preventDefault()
@@ -981,7 +1549,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return () => {
             document.removeEventListener('keydown', handleKeyDown)
         }
-    }, [handleTextSelection, languageId, filteredTags.length])
+    }, [handleTextSelection, resolvedLanguageId, filteredTags.length])
 
     // Paste handler
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -1009,6 +1577,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const handleInput = () => {
         checkContent()
         updateTagStatistics()
+        if (textId && !forceCreate) {
+            const innerText = editorRef.current?.innerText.trim() || ''
+            if (!innerText.length) {
+                setForceCreate(true)
+            }
+        }
     }
 
     const handleFullscreenChange = (): void => {
@@ -1043,7 +1617,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         const tagAbbreviations = parts.slice(1)
 
         return tagAbbreviations.map((abbr, index) => {
-            const tag = tags.find((t) => t.abbreviation === abbr)
+            const tag = tagSource.find((t) => t.abbreviation === abbr)
             return {
                 abbreviation: abbr,
                 name: tag?.name_tag || 'Unknown Tag',
@@ -1059,6 +1633,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 isFullscreen ? 'fullscreen' : ''
             }`}
         >
+            <input
+                ref={fileInputRef}
+                type='file'
+                accept='.txt'
+                style={{ display: 'none' }}
+                onChange={handleFileInputChange}
+            />
             <div className='chat-input-wrapper'>
                 <div
                     ref={editorRef}
@@ -1202,7 +1783,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                                         fontSize: '12px',
                                     }}
                                 >
-                                    {languageId
+                                    {resolvedLanguageId
                                         ? 'Ushbu tilda teglar topilmadi'
                                         : 'Iltimos, avval til tanlang'}
                                 </div>
