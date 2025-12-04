@@ -80,6 +80,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         Record<string, { count: number; color: string }>
     >({})
 
+    const containerRef = useRef<HTMLDivElement>(null)
     const editorRef = useRef<HTMLDivElement>(null)
     const tagMenuRef = useRef<HTMLDivElement>(null)
     const editMenuRef = useRef<HTMLDivElement>(null)
@@ -1600,6 +1601,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
     }, [])
 
+    const handleToggleFullscreen = async () => {
+        if (!containerRef.current) return
+
+        try {
+            if (!document.fullscreenElement) {
+                await containerRef.current.requestFullscreen()
+            } else {
+                await document.exitFullscreen()
+            }
+        } catch (error) {
+            console.error('Fullscreen toggle failed:', error)
+        }
+    }
+
     const handleCloseNotification = () => {
         setNotification((prev) => ({ ...prev, open: false }))
     }
@@ -1630,6 +1645,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     return (
         <div
+            ref={containerRef}
             className={`chat-input-container ${
                 isFullscreen ? 'fullscreen' : ''
             }`}
@@ -1978,6 +1994,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                                     ? 'Exit fullscreen'
                                     : 'Enter fullscreen'
                             }
+                            onClick={handleToggleFullscreen}
                         >
                             {isFullscreen ? (
                                 <FullscreenExitIcon />

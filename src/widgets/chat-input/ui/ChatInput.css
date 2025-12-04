@@ -14,7 +14,14 @@
     align-items: center;
     justify-content: center;
     padding: 40px;
-    background: transparent;
+    background: radial-gradient(
+        circle at top right,
+        rgba(219, 239, 255, 0.95) 0%,
+        rgba(183, 215, 255, 0.92) 30%,
+        rgba(150, 201, 255, 0.9) 55%,
+        rgba(124, 190, 255, 0.88) 75%,
+        rgba(103, 176, 255, 0.86) 100%
+    );
     backdrop-filter: blur(18px);
 }
 

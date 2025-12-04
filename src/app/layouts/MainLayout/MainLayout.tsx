@@ -9,6 +9,8 @@ import {
     Language,
 } from '@/shared/api/linguistics/linguisticsApi'
 import { TagStatistics } from '@/widgets/tagstatistics'
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 
 const DEFAULT_ANALYSIS_TYPE = 1
 
@@ -56,6 +58,8 @@ const MainLayout: React.FC = () => {
     const [sidebarRefreshKey, setSidebarRefreshKey] = useState<number>(0)
     const [shouldAutoSelectLanguage, setShouldAutoSelectLanguage] =
         useState<boolean>(true)
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false)
+    const [isStatsCollapsed, setIsStatsCollapsed] = useState<boolean>(false)
 
     const navigate = useNavigate()
 
@@ -238,6 +242,14 @@ const MainLayout: React.FC = () => {
         setShowContentMenu(false)
         setTextId(undefined) // YANGI: Text ID ni tozalash
         navigate('/editor')
+    }
+
+    const handleSidebarToggle = () => {
+        setIsSidebarCollapsed((prev) => !prev)
+    }
+
+    const handleStatsToggle = () => {
+        setIsStatsCollapsed((prev) => !prev)
     }
 
     const handleTextDeleted = (deletedId: number) => {
@@ -468,7 +480,23 @@ const MainLayout: React.FC = () => {
     }
 
     return (
-        <div className='main-layout'>
+        <div
+            className={`main-layout ${
+                isSidebarCollapsed ? 'sidebar-collapsed' : ''
+            }`}
+        >
+            <button
+                className={`sidebar-collapse-toggle ${
+                    isSidebarCollapsed ? 'collapsed' : ''
+                }`}
+                onClick={handleSidebarToggle}
+                aria-label={
+                    isSidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'
+                }
+            >
+                {isSidebarCollapsed ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+            </button>
+
             {/* YANGI: Sidebar'ga onTextClick prop'ini qo'shdik */}
             <Sidebar
                 activeItem={activeLanguageId}
@@ -481,6 +509,7 @@ const MainLayout: React.FC = () => {
                 activeTab={activeTab}
                 refreshKey={sidebarRefreshKey}
                 onTextDeleted={handleTextDeleted}
+                collapsed={isSidebarCollapsed}
             />
 
             <div className='main-content'>
@@ -515,8 +544,25 @@ const MainLayout: React.FC = () => {
                                 />
                             </div>
 
-                            <div className='statistics-section'>
-                                <TagStatistics stats={tagStats} />
+                            <div className='statistics-shell'>
+                                <button
+                                    className='stats-toggle'
+                                    onClick={handleStatsToggle}
+                                    aria-label='Toggle tag statistics'
+                                >
+                                    TagStatistics
+                                </button>
+                                <div
+                                    className={`statistics-wrapper ${
+                                        isStatsCollapsed ? 'collapsed' : ''
+                                    }`}
+                                >
+                                    <div className='statistics-panel'>
+                                        <div className='statistics-content'>
+                                            <TagStatistics stats={tagStats} />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}

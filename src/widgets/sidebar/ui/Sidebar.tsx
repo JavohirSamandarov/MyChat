@@ -19,6 +19,7 @@ interface SidebarProps {
     activeTab?: number
     refreshKey?: number
     onTextDeleted?: (textId: number) => void
+    collapsed?: boolean
 }
 
 // YANGI: TaggedText interfeysi
@@ -52,6 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     activeTab = 0,
     refreshKey = 0,
     onTextDeleted = () => {},
+    collapsed = false,
 }) => {
     const [linguistics, setLinguistics] = useState<LinguisticsData[]>([])
     const [userTexts, setUserTexts] = useState<TaggedText[]>([])
@@ -294,7 +296,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     const sectionTitle = currentLinguistic?.name || 'Loading...'
 
     return (
-        <div className='sidebar'>
+        <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
             <div className='sidebar-header'>
                 <h2 className='sidebar-title'>Annotation Tool</h2>
                 <button className='new-chat-button' onClick={onEditorClick}>
