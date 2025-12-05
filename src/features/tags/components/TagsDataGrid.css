@@ -1,0 +1,111 @@
+.tags-grid-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 24px 32px;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background: #f8fafc;
+    border-left: 1px solid #e5e7eb;
+}
+
+.tags-grid-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: flex-end;
+}
+
+.tags-grid-header h1 {
+    margin: 4px 0 6px;
+    font-size: 28px;
+    color: #111827;
+}
+
+.tags-grid-header p {
+    margin: 0;
+    color: #6b7280;
+    line-height: 1.5;
+}
+
+.tags-grid-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    min-width: 320px;
+}
+
+.tags-grid-filter {
+    min-width: 260px;
+}
+
+.tags-grid-select {
+    min-width: 220px;
+}
+
+.tags-grid-table {
+    flex: 1;
+    background: #ffffff;
+    border-radius: 18px;
+    border: 1px solid #e5e7eb;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.tags-grid-table .MuiDataGrid-root {
+    border: none;
+    flex: 1;
+    min-height: 0;
+}
+
+.tag-color-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.tag-color-dot {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.tag-color-code {
+    font-size: 12px;
+    color: #64748b;
+}
+
+.tags-grid-empty {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+}
+
+@media (max-width: 960px) {
+    .tags-grid-wrapper {
+        padding: 16px;
+    }
+
+    .tags-grid-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .tags-grid-filter {
+        width: 100%;
+    }
+
+    .tags-grid-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

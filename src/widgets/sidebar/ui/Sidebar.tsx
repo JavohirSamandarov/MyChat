@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from 'react'
 import { SidebarSection } from './SidebarSection'
 import './Sidebar.css'
-import { LogoutButton } from '@/features/auth/components/LogoutButton'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/features/auth/hooks/useAuth'
 import {
-    linguisticsApi,
-    LinguisticsData,
-    Language,
-} from '@/shared/api/linguistics/linguisticsApi'
+    Avatar,
+    Button,
+    ListItemIcon,
+    Menu,
+    MenuItem,
+    Tooltip,
+} from '@mui/material'
+import LogoutIcon from '@mui/icons-material/Logout'
+import LocalOfferIcon from '@mui/icons-material/LocalOffer'
+import AccountCircleIcon from '@mui/icons-material/AccountCircle'
 
 interface SidebarProps {
-    activeItem?: string
     activeTextId?: number
     activeLinguisticId?: number
-    onItemClick?: (itemText: string, languageId?: number) => void
     onTextClick?: (textId: number, textTitle: string) => void
     onEditorClick?: () => void
-    onCloseLanguage?: () => void
-    activeTab?: number
     refreshKey?: number
     onTextDeleted?: (textId: number) => void
     collapsed?: boolean
@@ -43,81 +46,27 @@ interface TaggedTextsResponse {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-    activeItem = '',
     activeTextId,
     activeLinguisticId,
-    onItemClick = () => {},
     onTextClick = () => {},
     onEditorClick = () => {},
-    onCloseLanguage = () => {},
-    activeTab = 0,
     refreshKey = 0,
     onTextDeleted = () => {},
     collapsed = false,
 }) => {
-    const [linguistics, setLinguistics] = useState<LinguisticsData[]>([])
     const [userTexts, setUserTexts] = useState<TaggedText[]>([])
-    const [loading, setLoading] = useState(true)
     const [textsLoading, setTextsLoading] = useState(true)
-    const [defaultLanguageId, setDefaultLanguageId] = useState<string>('')
     const [pendingDelete, setPendingDelete] = useState<{
         id: number
         title: string
     } | null>(null)
-
-    useEffect(() => {
-        const loadData = async () => {
-            try {
-                setLoading(true)
-                const data = await linguisticsApi.getLinguistics()
-                setLinguistics(data)
-
-                // Birinchi tilni topish va active qilish
-                if (data.length > 0) {
-                    const firstLinguistic = data[0]
-                    const languages =
-                        getLanguagesFromFirstLinguistic(firstLinguistic)
-                    if (languages.length > 0) {
-                        const firstLanguage = languages[0]
-                        setDefaultLanguageId(firstLanguage.id.toString())
-                        // Parent componentga birinchi tilni active qilish uchun signal yuborish
-                        if (onItemClick) {
-                            onItemClick(firstLanguage.name, firstLanguage.id)
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load linguistics:', error)
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        loadData()
-    }, [])
-
-    // Birinchi linguistic ma'lumotlaridan tillarni olish
-    const getLanguagesFromFirstLinguistic = (
-        linguistic: LinguisticsData
-    ): Language[] => {
-        if (!linguistic) return []
-
-        if (linguistic.languages && linguistic.languages.length > 0) {
-            return linguistic.languages
-        }
-
-        const uniqueLanguages: Language[] = []
-        const languageMap = new Map<number, Language>()
-
-        linguistic.tags.forEach((tag) => {
-            if (!languageMap.has(tag.language.id)) {
-                languageMap.set(tag.language.id, tag.language)
-                uniqueLanguages.push(tag.language)
-            }
-        })
-
-        return uniqueLanguages
-    }
+    const [editingTextId, setEditingTextId] = useState<number | null>(null)
+    const [editingValue, setEditingValue] = useState<string>('')
+    const [isRenaming, setIsRenaming] = useState<boolean>(false)
+    const [accountMenuAnchor, setAccountMenuAnchor] =
+        useState<null | HTMLElement>(null)
+    const { logout, user } = useAuth()
+    const navigate = useNavigate()
 
     // YANGI: To'g'ri API dan foydalanish
     useEffect(() => {
@@ -234,6 +183,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             if (activeTextId === pendingDelete.id) {
                 onTextDeleted(pendingDelete.id)
             }
+            if (editingTextId === pendingDelete.id) {
+                setEditingTextId(null)
+                setEditingValue('')
+            }
         } catch (error) {
             console.error('Failed to delete text:', error)
         } finally {
@@ -245,55 +198,109 @@ export const Sidebar: React.FC<SidebarProps> = ({
         setPendingDelete(null)
     }
 
-    const currentLinguistic = linguistics[activeTab]
-
-    const getLanguagesFromTags = (): Language[] => {
-        if (!currentLinguistic) return []
-
-        if (
-            currentLinguistic.languages &&
-            currentLinguistic.languages.length > 0
-        ) {
-            return currentLinguistic.languages
-        }
-
-        const uniqueLanguages: Language[] = []
-        const languageMap = new Map<number, Language>()
-
-        currentLinguistic.tags.forEach((tag) => {
-            if (!languageMap.has(tag.language.id)) {
-                languageMap.set(tag.language.id, tag.language)
-                uniqueLanguages.push(tag.language)
-            }
-        })
-
-        return uniqueLanguages
-    }
-
-    const languages = getLanguagesFromTags()
-
-    // Agar activeItem bo'sh bo'lsa va hech qanday text tanlanmagan bo'lsa, joriy tabdagi birinchi tilni active qilish
-    const fallbackLanguageId =
-        languages.length > 0 ? languages[0].id.toString() : defaultLanguageId
-    const shouldUseFallback =
-        !activeItem && !activeTextId && !!fallbackLanguageId
-    const activeLanguageItem = shouldUseFallback
-        ? fallbackLanguageId
-        : activeItem
     const activeUserTextId = activeTextId ? activeTextId.toString() : ''
 
     const filteredUserTexts = userTexts.filter((text) => {
         const matchesLinguistic = activeLinguisticId
             ? text.analysis_type === activeLinguisticId
             : true
-        const matchesLanguage =
-            activeLanguageItem && activeLanguageItem.trim().length > 0
-                ? text.language.toString() === activeLanguageItem
-                : true
-        return matchesLinguistic && matchesLanguage
+        return matchesLinguistic
     })
 
-    const sectionTitle = currentLinguistic?.name || 'Loading...'
+    const accountLabel =
+        [user?.first_name, user?.last_name].filter(Boolean).join(' ') ||
+        user?.email ||
+        'Account'
+    const accountInitials = [user?.first_name, user?.last_name]
+        .filter(Boolean)
+        .map((name) => (name ? name.charAt(0).toUpperCase() : ''))
+        .join('')
+
+    const handleStartEdit = (textId: number, currentTitle: string) => {
+        setEditingTextId(textId)
+        setEditingValue(currentTitle)
+    }
+
+    const handleEditChange = (value: string) => {
+        setEditingValue(value)
+    }
+
+    const handleCancelEdit = () => {
+        setEditingTextId(null)
+        setEditingValue('')
+    }
+
+    const handleSubmitEdit = async () => {
+        if (!editingTextId) return
+        const trimmedTitle = editingValue.trim()
+        if (!trimmedTitle || isRenaming) return
+
+        const authToken = getAuthToken()
+        if (!authToken) {
+            return
+        }
+
+        const targetText = userTexts.find((text) => text.id === editingTextId)
+        if (!targetText) return
+
+        try {
+            setIsRenaming(true)
+            const response = await fetch(
+                `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/${editingTextId}/`,
+                {
+                    method: 'PUT',
+                    headers: {
+                        Authorization: `Bearer ${authToken}`,
+                        Accept: 'application/json',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        title: trimmedTitle,
+                        text: targetText.text || '',
+                        file: targetText.file,
+                        language: targetText.language,
+                        analysis_type: targetText.analysis_type,
+                    }),
+                }
+            )
+
+            if (!response.ok) {
+                throw new Error('Failed to rename text')
+            }
+
+            setUserTexts((prev) =>
+                prev.map((textItem) =>
+                    textItem.id === editingTextId
+                        ? { ...textItem, title: trimmedTitle }
+                        : textItem
+                )
+            )
+            handleCancelEdit()
+        } catch (error) {
+            console.error('Failed to rename text:', error)
+        } finally {
+            setIsRenaming(false)
+        }
+    }
+
+    const handleAccountMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+        setAccountMenuAnchor(event.currentTarget)
+    }
+
+    const handleAccountMenuClose = () => {
+        setAccountMenuAnchor(null)
+    }
+
+    const handleAccountAction = (action: 'logout' | 'tags') => {
+        if (action === 'logout') {
+            logout()
+            navigate('/login')
+            window.location.reload()
+        } else if (action === 'tags') {
+            navigate('/tags')
+        }
+        handleAccountMenuClose()
+    }
 
     return (
         <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
@@ -305,23 +312,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             <div className='sidebar-content'>
-                {loading ? (
-                    <div className='loading'>Loading languages...</div>
-                ) : (
-                    <SidebarSection
-                        title={sectionTitle}
-                        items={languages.map((lang) => ({
-                            id: lang.id.toString(),
-                            text: lang.name,
-                            languageId: lang.id,
-                        }))}
-                        activeItem={activeLanguageItem}
-                        activeMatchBy='id'
-                        onItemClick={onItemClick}
-                        showDelete={!!activeLanguageItem}
-                        onCloseLanguage={onCloseLanguage}
-                    />
-                )}
                 {/* User Texts bo'limi */}
                 <SidebarSection
                     title='Your Texts'
@@ -336,11 +326,70 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     showDelete={true}
                     isLoading={textsLoading}
                     onTextDelete={handleTextDelete}
+                    onTextEditStart={handleStartEdit}
+                    onTextEditChange={handleEditChange}
+                    onTextEditSubmit={handleSubmitEdit}
+                    onTextEditCancel={handleCancelEdit}
+                    editingTextId={editingTextId}
+                    editingTextValue={editingValue}
                 />
             </div>
 
             <div className='sidebar-footer'>
-                <LogoutButton />
+                <Tooltip title='Account options' placement='top'>
+                    <Button
+                        id='account-menu-button'
+                        className='account-menu-button'
+                        onClick={handleAccountMenuOpen}
+                        startIcon={
+                            <Avatar className='account-menu-avatar'>
+                                {accountInitials ? (
+                                    accountInitials
+                                ) : (
+                                    <AccountCircleIcon fontSize='small' />
+                                )}
+                            </Avatar>
+                        }
+                    >
+                        {accountLabel}
+                    </Button>
+                </Tooltip>
+                <Menu
+                    anchorEl={accountMenuAnchor}
+                    id='account-menu'
+                    open={Boolean(accountMenuAnchor)}
+                    onClose={handleAccountMenuClose}
+                    onClick={handleAccountMenuClose}
+                    transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+                    anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+                    PaperProps={{
+                        className: 'sidebar-account-menu',
+                        elevation: 0,
+                    }}
+                    MenuListProps={{
+                        'aria-labelledby': 'account-menu-button',
+                        className: 'sidebar-account-menu-list',
+                    }}
+                >
+                    <MenuItem
+                        className='sidebar-account-menu-item'
+                        onClick={() => handleAccountAction('tags')}
+                    >
+                        <ListItemIcon className='sidebar-account-menu-icon'>
+                            <LocalOfferIcon fontSize='small' />
+                        </ListItemIcon>
+                        Tags
+                    </MenuItem>
+                    <MenuItem
+                        className='sidebar-account-menu-item logout'
+                        onClick={() => handleAccountAction('logout')}
+                    >
+                        <ListItemIcon className='sidebar-account-menu-icon'>
+                            <LogoutIcon fontSize='small' />
+                        </ListItemIcon>
+                        Logout
+                    </MenuItem>
+                </Menu>
             </div>
 
             {pendingDelete && (

@@ -1208,18 +1208,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 onTextSaved(savedText, { isUpdate })
                 setLoadedLanguageId(savedText.language)
                 setForceCreate(false)
-                if (!isUpdate && editorRef.current) {
-                    editorRef.current.innerHTML = ''
-                    setHasContent(false)
-                    setSelectedRange(null)
-                    setSelectedAnnotatedElement(null)
-                    setCurrentSelection('')
-                    setShowTagMenu(false)
-                    setShowEditMenu(false)
-                    window.getSelection()?.removeAllRanges()
-                    updateTagStatistics()
-                    setImportedAnalysisType(null)
-                }
             }
         } catch (error) {
             console.error('Error sending to backend:', error)
