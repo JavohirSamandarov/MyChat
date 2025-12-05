@@ -281,10 +281,11 @@ const MainLayout: React.FC = () => {
         }
 
         if (context.isUpdate) {
-            resetToDefaultState()
-        } else {
-            setTextId(undefined)
+            setTextId(savedText.id)
+            return
         }
+
+        setTextId(savedText.id)
     }
 
     return (

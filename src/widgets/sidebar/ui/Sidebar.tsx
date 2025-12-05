@@ -33,8 +33,8 @@ interface TaggedText {
     language: number
     title: string
     file: string | null
-    text: string
-    metadata: Record<string, unknown> // any -> unknown
+    text?: string | null
+    metadata?: unknown
 }
 
 // YANGI: API response formati
@@ -43,6 +43,55 @@ interface TaggedTextsResponse {
     next: string | null
     previous: string | null
     results: TaggedText[]
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+
+const fetchTaggedTextDetail = async (
+    textId: number,
+    authToken: string
+): Promise<TaggedText | null> => {
+    try {
+        const response = await fetch(
+            `${API_BASE_URL}/tagged_texts/${textId}/`,
+            {
+                headers: {
+                    Authorization: `Bearer ${authToken}`,
+                    Accept: 'application/json',
+                },
+            }
+        )
+
+        if (!response.ok) {
+            console.error(
+                'Failed to fetch tagged text detail:',
+                response.status
+            )
+            return null
+        }
+
+        return await response.json()
+    } catch (error) {
+        console.error('Failed to fetch tagged text detail:', error)
+        return null
+    }
+}
+
+const hasTextOrFile = (
+    textItem?: TaggedText | null
+): textItem is TaggedText => {
+    if (!textItem) {
+        return false
+    }
+
+    const hasText =
+        typeof textItem.text === 'string' &&
+        textItem.text.trim().length > 0
+    const hasFile =
+        typeof textItem.file === 'string' &&
+        textItem.file.trim().length > 0
+
+    return hasText || hasFile
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -82,7 +131,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }
 
                 const response = await fetch(
-                    `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/`,
+                    `${API_BASE_URL}/tagged_texts/`,
                     {
                         headers: {
                             Authorization: `Bearer ${authToken}`,
@@ -162,7 +211,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         try {
             const response = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/${pendingDelete.id}/`,
+                `${API_BASE_URL}/tagged_texts/${pendingDelete.id}/`,
                 {
                     method: 'DELETE',
                     headers: {
@@ -240,13 +289,86 @@ export const Sidebar: React.FC<SidebarProps> = ({
             return
         }
 
-        const targetText = userTexts.find((text) => text.id === editingTextId)
-        if (!targetText) return
+        let targetText =
+            userTexts.find((text) => text.id === editingTextId) || null
 
         try {
             setIsRenaming(true)
+
+            if (!hasTextOrFile(targetText)) {
+                const detailedText = await fetchTaggedTextDetail(
+                    editingTextId,
+                    authToken
+                )
+                if (detailedText) {
+                    targetText = targetText
+                        ? { ...targetText, ...detailedText }
+                        : detailedText
+                    setUserTexts((prev) => {
+                        const exists = prev.some(
+                            (textItem) => textItem.id === detailedText.id
+                        )
+                        if (!exists) {
+                            return [...prev, detailedText].sort(
+                                (a, b) => b.id - a.id
+                            )
+                        }
+                        return prev.map((textItem) =>
+                            textItem.id === detailedText.id
+                                ? { ...textItem, ...detailedText }
+                                : textItem
+                        )
+                    })
+                }
+            }
+
+            if (!hasTextOrFile(targetText)) {
+                console.error(
+                    'Unable to rename text: no text or file content available.'
+                )
+                return
+            }
+
+            const renamePayload: Record<string, unknown> = {
+                title: trimmedTitle,
+                language: targetText.language,
+                analysis_type: targetText.analysis_type,
+                user: targetText.user,
+            }
+
+            if (
+                typeof targetText.text === 'string' &&
+                targetText.text.trim().length > 0
+            ) {
+                renamePayload.text = targetText.text
+            }
+
+            if (
+                typeof targetText.file === 'string' &&
+                targetText.file.trim().length > 0
+            ) {
+                renamePayload.file = targetText.file
+            }
+
+            if (
+                targetText.metadata !== undefined &&
+                targetText.metadata !== null
+            ) {
+                renamePayload.metadata =
+                    typeof targetText.metadata === 'string'
+                        ? targetText.metadata
+                        : JSON.stringify(targetText.metadata)
+            }
+
+            if (!('text' in renamePayload) && !('file' in renamePayload)) {
+                console.error(
+                    'Unable to rename text: missing text/file payload.'
+                )
+                return
+            }
+
             const response = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/${editingTextId}/`,
+                `${API_BASE_URL}/tagged_texts/${editingTextId}/`,
                 {
                     method: 'PUT',
                     headers: {
@@ -254,13 +376,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         Accept: 'application/json',
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        title: trimmedTitle,
-                        text: targetText.text || '',
-                        file: targetText.file,
-                        language: targetText.language,
-                        analysis_type: targetText.analysis_type,
-                    }),
+                    body: JSON.stringify(renamePayload),
                 }
             )
 
