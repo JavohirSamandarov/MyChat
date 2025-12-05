@@ -175,11 +175,11 @@ export const TagsDataGrid: React.FC<TagsDataGridProps> = ({ rows }) => {
                     initialState={{
                         pagination: {
                             paginationModel: {
-                                pageSize: 10,
+                                pageSize: 20,
                             },
                         },
                     }}
-                    pageSizeOptions={[10, 20, 30, 50]}
+                    pageSizeOptions={[20, 30, 50]}
                     slots={{
                         toolbar: GridToolbar,
                         noRowsOverlay: () => (

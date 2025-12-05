@@ -89,6 +89,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         number | null
     >(null)
     const [forceCreate, setForceCreate] = useState<boolean>(false)
+    const [pendingImportSave, setPendingImportSave] = useState<{
+        analysisTypeId: number
+        languageId: number
+        token: number
+    } | null>(null)
     const latestStatsRef = useRef<
         Record<string, { count: number; color: string }>
     >({})
@@ -99,6 +104,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const editMenuRef = useRef<HTMLDivElement>(null)
     const importExportRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
+    const importAutoSaveTokenRef = useRef<number | null>(null)
     const {
         tags: editorTags,
         handleTextSelect,
@@ -615,6 +621,60 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
     }, [textId])
 
+    useEffect(() => {
+        if (
+            !pendingImportSave ||
+            !hasContent ||
+            !pendingImportSave.languageId ||
+            !pendingImportSave.analysisTypeId
+        ) {
+            return
+        }
+
+        const languageMatches =
+            (languageId &&
+                languageId === pendingImportSave.languageId) ||
+            (!languageId &&
+                resolvedLanguageId === pendingImportSave.languageId)
+        const analysisMatches =
+            analysisType === pendingImportSave.analysisTypeId
+
+        if (!languageMatches || !analysisMatches) {
+            return
+        }
+
+        const currentToken = pendingImportSave.token
+
+        if (
+            importAutoSaveTokenRef.current &&
+            importAutoSaveTokenRef.current === currentToken
+        ) {
+            return
+        }
+
+        importAutoSaveTokenRef.current = currentToken
+
+        const runAutoSave = async () => {
+            try {
+                await handleSend()
+            } finally {
+                if (importAutoSaveTokenRef.current === currentToken) {
+                    importAutoSaveTokenRef.current = null
+                    setPendingImportSave(null)
+                }
+            }
+        }
+
+        runAutoSave()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+        analysisType,
+        languageId,
+        resolvedLanguageId,
+        hasContent,
+        pendingImportSave,
+    ])
+
     // Teglarni yuklash
     useEffect(() => {
         if (!editorTagsLoading && editorTags.length === 0) {
@@ -1102,7 +1162,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
 
         const reader = new FileReader()
-        reader.onload = () => {
+        reader.onload = async () => {
             try {
                 const content = reader.result?.toString() || ''
                 const trimmedContent = content.trim()
@@ -1205,15 +1265,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     setImportedAnalysisType(null)
                 }
 
-                if (
-                    derivedLanguageId &&
-                    derivedAnalysisTypeId &&
-                    derivedAnalysisTypeId > 0
-                ) {
-                    onImportContextDetected?.({
-                        analysisTypeId: derivedAnalysisTypeId,
-                        languageId: derivedLanguageId,
+                const hasValidContext =
+                    Boolean(derivedLanguageId) &&
+                    Boolean(derivedAnalysisTypeId && derivedAnalysisTypeId > 0)
+
+                if (hasValidContext) {
+                    setPendingImportSave({
+                        analysisTypeId: derivedAnalysisTypeId as number,
+                        languageId: derivedLanguageId as number,
+                        token: Date.now(),
                     })
+                    importAutoSaveTokenRef.current = null
+                    onImportContextDetected?.({
+                        analysisTypeId: derivedAnalysisTypeId as number,
+                        languageId: derivedLanguageId as number,
+                    })
+                } else {
+                    setPendingImportSave(null)
+                    importAutoSaveTokenRef.current = null
                 }
 
                 latestStatsRef.current = statsPayload

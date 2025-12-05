@@ -13,7 +13,6 @@
     transition: transform 0.3s ease;
 }
 
-
 .sidebar.collapsed {
     transform: translateX(-100%);
     pointer-events: none;
@@ -94,7 +93,8 @@
 }
 
 .sidebar-item.active {
-    background-color: #ebf2ff;
+    /*bg #ebf2ff */
+    background-color: #d5e0f5;
     color: #1d4ed8;
     font-weight: 600;
 }
@@ -171,6 +171,7 @@
 
 /* Sidebar footer */
 .sidebar-footer {
+    position: relative;
     border-top: 1px solid #e5e7eb;
     padding: 16px;
     background-color: #ffffff;
@@ -238,12 +239,12 @@
 .sidebar-account-menu {
     border-radius: 16px !important;
     border: 1px solid #e2e8f0;
-    padding: 6px 0;
-    min-width: 200px;
+    min-width: 246.76px !important;
+    top: 935px !important;
 }
 
 .sidebar-account-menu-list {
-    padding: 0;
+    padding: 0 !important;
 }
 
 .sidebar-account-menu-item {
@@ -372,4 +373,3 @@
 .modal-button.delete:hover {
     background: #e04344;
 }
-

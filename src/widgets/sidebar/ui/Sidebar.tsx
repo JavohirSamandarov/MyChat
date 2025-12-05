@@ -94,6 +94,49 @@ const hasTextOrFile = (
     return hasText || hasFile
 }
 
+const resolveApiUrl = (url: string): string => {
+    if (!url) {
+        return API_BASE_URL
+    }
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+        return url
+    }
+    const base = API_BASE_URL.replace(/\/$/, '')
+    const normalizedPath = url.replace(/^\//, '')
+    return `${base}/${normalizedPath}`
+}
+
+const fetchAllTaggedTexts = async (
+    authToken: string
+): Promise<TaggedText[]> => {
+    const headers = {
+        Authorization: `Bearer ${authToken}`,
+        Accept: 'application/json',
+    }
+
+    const aggregated: TaggedText[] = []
+    let nextUrl: string | null = resolveApiUrl('/tagged_texts/')
+
+    while (nextUrl) {
+        try {
+            const response = await fetch(nextUrl, { headers })
+            if (!response.ok) {
+                console.error('Failed to fetch tagged texts page:', nextUrl)
+                break
+            }
+
+            const data: TaggedTextsResponse = await response.json()
+            aggregated.push(...data.results)
+            nextUrl = data.next ? resolveApiUrl(data.next) : null
+        } catch (error) {
+            console.error('Error fetching tagged texts page:', error)
+            break
+        }
+    }
+
+    return aggregated
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
     activeTextId,
     activeLinguisticId,
@@ -130,26 +173,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     return
                 }
 
-                const response = await fetch(
-                    `${API_BASE_URL}/tagged_texts/`,
-                    {
-                        headers: {
-                            Authorization: `Bearer ${authToken}`,
-                            Accept: 'application/json',
-                        },
-                    }
-                )
-
-                if (response.ok) {
-                    const data: TaggedTextsResponse = await response.json()
-                    const sortedTexts = [...data.results].sort(
-                        (a, b) => b.id - a.id
-                    )
-                    setUserTexts(sortedTexts)
-                } else {
-                    console.error('Failed to load user texts')
-                    setUserTexts([])
-                }
+                const allTexts = await fetchAllTaggedTexts(authToken)
+                const sortedTexts = [...allTexts].sort((a, b) => b.id - a.id)
+                setUserTexts(sortedTexts)
             } catch (error) {
                 console.error('Failed to load user texts:', error)
                 setUserTexts([])
