@@ -22,6 +22,12 @@ interface SavedTextPayload {
     metadata?: unknown
 }
 
+interface TagContextInfo {
+    analysisTypeId: number
+    languageId: number
+    tag: Tag
+}
+
 interface ChatInputProps {
     onSendMessage?: (message: string) => void
     taggedTextId?: number
@@ -36,6 +42,11 @@ interface ChatInputProps {
         savedText: SavedTextPayload,
         context: { isUpdate: boolean }
     ) => void
+    tagContextMap?: Record<string, TagContextInfo>
+    onImportContextDetected?: (context: {
+        analysisTypeId: number
+        languageId: number
+    }) => void
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
@@ -47,6 +58,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     onStatisticsUpdate,
     textId,
     onTextSaved = () => {},
+    tagContextMap,
+    onImportContextDetected,
 }) => {
     const [isFullscreen, setIsFullscreen] = useState<boolean>(false)
     const [showTagMenu, setShowTagMenu] = useState(false)
@@ -92,6 +105,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         addAnnotation,
         loadTags,
         clearSelection,
+        loading: editorTagsLoading,
     } = useEditor()
     const resolvedTaggedTextId = taggedTextId ?? textId
     const resolvedLanguageId = languageId ?? loadedLanguageId
@@ -99,13 +113,25 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         availableTags !== undefined ? availableTags : editorTags
 
     const findTagByAbbreviation = useCallback(
-        (abbr: string) =>
-            tagSource.find(
-                (tag) =>
-                    tag.abbreviation?.toLowerCase() ===
-                    abbr?.toLowerCase()
-            ),
-        [tagSource]
+        (abbr: string) => {
+            const normalized = abbr?.toLowerCase()
+            if (!normalized) {
+                return undefined
+            }
+            return (
+                tagSource.find(
+                    (tag) =>
+                        tag.abbreviation?.toLowerCase() ===
+                        normalized
+                ) ||
+                editorTags.find(
+                    (tag) =>
+                        tag.abbreviation?.toLowerCase() ===
+                        normalized
+                )
+            )
+        },
+        [editorTags, tagSource]
     )
 
     const getTagColor = useCallback(
@@ -426,6 +452,54 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return null
     }
 
+    const detectContextFromSerialized = useCallback(
+        (serialized: string) => {
+            if (!tagContextMap || !serialized) {
+                return null
+            }
+
+            const tokens = serialized.split(/\s+/)
+            for (const rawToken of tokens) {
+                if (!rawToken || rawToken.indexOf('/') === -1) {
+                    continue
+                }
+
+                const token = rawToken.trim()
+                if (!token.length) {
+                    continue
+                }
+
+                const parts = token.split('/')
+                if (parts.length < 2) {
+                    continue
+                }
+
+                for (let i = 1; i < parts.length; i++) {
+                    const abbr = parts[i]
+                    if (!abbr) {
+                        continue
+                    }
+                    const sanitized = abbr
+                        .replace(/[^A-Za-z0-9_-]/g, '')
+                        .toLowerCase()
+                    if (!sanitized) {
+                        continue
+                    }
+                    const context = tagContextMap[sanitized]
+                    if (context) {
+                        return {
+                            abbreviation: sanitized,
+                            ...context,
+                        }
+                    }
+                }
+            }
+
+            return null
+        },
+        [tagContextMap]
+    )
+
     // Show notification
     const showNotification = (
         message: string,
@@ -543,10 +617,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     // Teglarni yuklash
     useEffect(() => {
-        if (!availableTags) {
+        if (!editorTagsLoading && editorTags.length === 0) {
             loadTags()
         }
-    }, [availableTags, loadTags])
+    }, [editorTags.length, editorTagsLoading, loadTags])
 
     // Teglarni filterlash
     const filteredTags = tagSource
@@ -1092,14 +1166,54 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     throw new Error('Faylda teglangan matn topilmadi')
                 }
 
-                if (typeof nextLanguage === 'number') {
-                    setLoadedLanguageId(nextLanguage)
+                let derivedLanguageId =
+                    typeof nextLanguage === 'number'
+                        ? nextLanguage
+                        : undefined
+                let derivedAnalysisTypeId =
+                    typeof nextAnalysisType === 'number'
+                        ? nextAnalysisType
+                        : null
+
+                if (
+                    (!derivedLanguageId || !derivedAnalysisTypeId) &&
+                    importedText
+                ) {
+                    const detectedContext =
+                        detectContextFromSerialized(importedText)
+                    if (detectedContext) {
+                        if (!derivedLanguageId) {
+                            derivedLanguageId = detectedContext.languageId
+                        }
+                        if (!derivedAnalysisTypeId) {
+                            derivedAnalysisTypeId =
+                                detectedContext.analysisTypeId
+                        }
+                    }
                 }
 
-                if (nextAnalysisType && nextAnalysisType > 0) {
-                    setImportedAnalysisType(nextAnalysisType)
+                if (derivedLanguageId) {
+                    setLoadedLanguageId(derivedLanguageId)
+                }
+
+                if (
+                    derivedAnalysisTypeId &&
+                    derivedAnalysisTypeId > 0
+                ) {
+                    setImportedAnalysisType(derivedAnalysisTypeId)
                 } else {
                     setImportedAnalysisType(null)
+                }
+
+                if (
+                    derivedLanguageId &&
+                    derivedAnalysisTypeId &&
+                    derivedAnalysisTypeId > 0
+                ) {
+                    onImportContextDetected?.({
+                        analysisTypeId: derivedAnalysisTypeId,
+                        languageId: derivedLanguageId,
+                    })
                 }
 
                 latestStatsRef.current = statsPayload

@@ -236,6 +236,33 @@ const MainLayout: React.FC = () => {
         )
     }, [linguistics])
 
+    const tagContextMap = useMemo(() => {
+        const map: Record<
+            string,
+            {
+                analysisTypeId: number
+                languageId: number
+                tag: Tag
+            }
+        > = {}
+
+        linguistics.forEach((linguistic) => {
+            linguistic.tags.forEach((tag) => {
+                const abbr = tag.abbreviation?.toLowerCase()
+                if (!abbr || map[abbr]) {
+                    return
+                }
+                map[abbr] = {
+                    analysisTypeId: linguistic.id,
+                    languageId: tag.language.id,
+                    tag,
+                }
+            })
+        })
+
+        return map
+    }, [linguistics])
+
     const getCurrentTags = (): Tag[] => {
         const currentLinguistic = linguistics[activeTab]
         if (!currentLinguistic) {
@@ -287,6 +314,48 @@ const MainLayout: React.FC = () => {
 
         setTextId(savedText.id)
     }
+
+    const handleImportContextDetected = useCallback(
+        ({
+            analysisTypeId,
+            languageId,
+        }: {
+            analysisTypeId: number
+            languageId: number
+        }) => {
+            if (!analysisTypeId || !languageId) {
+                return
+            }
+
+            const tabIndex = linguistics.findIndex(
+                (linguistic) => linguistic.id === analysisTypeId
+            )
+            if (tabIndex === -1) {
+                return
+            }
+
+            setActiveTab(tabIndex)
+            setSelectedAnalysisType(analysisTypeId)
+
+            const targetLanguage =
+                getLanguagesForLinguistic(linguistics[tabIndex]).find(
+                    (language) => language.id === languageId
+                ) || findLanguageById(languageId)
+
+            applyLanguageState(targetLanguage || null)
+
+            if (!location.pathname.startsWith('/tags')) {
+                navigate(`/linguistics/${analysisTypeId}`)
+            }
+        },
+        [
+            applyLanguageState,
+            findLanguageById,
+            linguistics,
+            navigate,
+            location.pathname,
+        ]
+    )
 
     return (
         <div
@@ -352,6 +421,10 @@ const MainLayout: React.FC = () => {
                                     }}
                                     textId={textId} // YANGI: Text ID ni uzatish
                                     onTextSaved={handleTextSaved}
+                                    tagContextMap={tagContextMap}
+                                    onImportContextDetected={
+                                        handleImportContextDetected
+                                    }
                                 />
                             </div>
 
