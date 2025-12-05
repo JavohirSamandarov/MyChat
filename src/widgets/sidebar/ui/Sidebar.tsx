@@ -301,9 +301,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     authToken
                 )
                 if (detailedText) {
-                    targetText = targetText
-                        ? { ...targetText, ...detailedText }
-                        : detailedText
+                    targetText = {
+                        ...(targetText ?? {}),
+                        ...detailedText,
+                    } as TaggedText
                     setUserTexts((prev) => {
                         const exists = prev.some(
                             (textItem) => textItem.id === detailedText.id
