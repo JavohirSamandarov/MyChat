@@ -25,6 +25,7 @@ export interface LinguisticsData {
     description: string
     languages: Language[]
     tags: Tag[]
+    max_tags_count?: number
 }
 
 // API response strukturasi

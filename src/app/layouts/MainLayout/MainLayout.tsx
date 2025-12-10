@@ -416,6 +416,9 @@ const MainLayout: React.FC = () => {
                                     languageId={selectedLanguageId || undefined}
                                     analysisType={selectedAnalysisType}
                                     availableTags={getCurrentTags()}
+                                    maxTagsCount={
+                                        linguistics[activeTab]?.max_tags_count
+                                    }
                                     onStatisticsUpdate={(stats) => {
                                         setTagStats(stats)
                                     }}

@@ -1,4 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, {
+    useState,
+    useRef,
+    useEffect,
+    useCallback,
+    useMemo,
+} from 'react'
 import './ChatInput.css'
 import FullscreenIcon from '@mui/icons-material/Fullscreen'
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit'
@@ -34,6 +40,7 @@ interface ChatInputProps {
     languageId?: number
     analysisType?: number
     availableTags?: Tag[]
+    maxTagsCount?: number
     onStatisticsUpdate?: (
         stats: Record<string, { count: number; color: string }>
     ) => void
@@ -55,6 +62,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     languageId,
     analysisType = DEFAULT_ANALYSIS_TYPE,
     availableTags,
+    maxTagsCount,
     onStatisticsUpdate,
     textId,
     onTextSaved = () => {},
@@ -105,6 +113,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const importExportRef = useRef<HTMLDivElement>(null)
     const fileInputRef = useRef<HTMLInputElement>(null)
     const importAutoSaveTokenRef = useRef<number | null>(null)
+    const normalizedMaxTagsCount = useMemo(() => {
+        if (typeof maxTagsCount !== 'number') {
+            return Number.POSITIVE_INFINITY
+        }
+        if (!Number.isFinite(maxTagsCount)) {
+            return Number.POSITIVE_INFINITY
+        }
+        return Math.max(0, Math.floor(maxTagsCount))
+    }, [maxTagsCount])
     const {
         tags: editorTags,
         handleTextSelect,
@@ -634,6 +651,74 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         })
     }
 
+    const getTagLimitError = useCallback((): string | null => {
+        if (!selectedRange) {
+            return null
+        }
+
+        if (normalizedMaxTagsCount === 0) {
+            return "Bu tahlil turida teg qo'shish cheklangan."
+        }
+
+        const annotatedElements = new Set<HTMLElement>()
+
+        const registerAnnotatedElement = (node: Node | null) => {
+            if (!node) return
+            if (
+                node.nodeType === Node.TEXT_NODE &&
+                node.parentElement?.classList.contains('annotated-text')
+            ) {
+                annotatedElements.add(node.parentElement)
+                return
+            }
+
+            if (
+                node.nodeType === Node.ELEMENT_NODE &&
+                (node as HTMLElement).classList.contains('annotated-text')
+            ) {
+                annotatedElements.add(node as HTMLElement)
+            }
+        }
+
+        registerAnnotatedElement(selectedRange.startContainer)
+        registerAnnotatedElement(selectedRange.endContainer)
+
+        if (editorRef.current) {
+            const walker = document.createTreeWalker(
+                editorRef.current,
+                NodeFilter.SHOW_ELEMENT
+            )
+            let currentNode: Node | null = walker.currentNode
+            while ((currentNode = walker.nextNode())) {
+                if (
+                    currentNode instanceof HTMLElement &&
+                    currentNode.classList.contains('annotated-text') &&
+                    selectedRange.intersectsNode(currentNode)
+                ) {
+                    annotatedElements.add(currentNode)
+                }
+            }
+        }
+
+        if (!annotatedElements.size) {
+            return null
+        }
+
+        if (!Number.isFinite(normalizedMaxTagsCount)) {
+            return null
+        }
+
+        for (const element of annotatedElements) {
+            const currentText = element.textContent || ''
+            const currentTags = currentText.split('/').slice(1).filter(Boolean)
+            if (currentTags.length >= normalizedMaxTagsCount) {
+                return `Bir so'zga faqat ${normalizedMaxTagsCount} tag qo'yish mumkin.`
+            }
+        }
+
+        return null
+    }, [normalizedMaxTagsCount, selectedRange])
+
     // Content bor-yo'qligini tekshirish
     const checkContent = useCallback(() => {
         if (editorRef.current) {
@@ -991,6 +1076,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     // Teg tanlanganida
     const handleTagSelect = async (tag: Tag) => {
+        const limitError = getTagLimitError()
+        if (limitError) {
+            showNotification(limitError, 'error')
+            return
+        }
         let success = true
         if (resolvedTaggedTextId) {
             success = await addAnnotation(resolvedTaggedTextId, tag.id)
@@ -1046,6 +1136,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         const selectedText = selectedRange.toString()
         const trimmedSelection = selectedText.trim()
         if (trimmedSelection.length === 0) return
+
+        const limitError = getTagLimitError()
+        if (limitError) {
+            showNotification(limitError, 'error')
+            return
+        }
         const selectionEndsWithPeriod = trimmedSelection.endsWith('.')
 
         return new Promise((resolve) => {
@@ -1073,8 +1169,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const normalizedOriginal = originalText.replace(/\+/g, ' ')
                 const originalEndsWithPeriod =
                     normalizedOriginal.trim().endsWith('.')
-
-                const newTags = [...parts.slice(1), tag.abbreviation || 'TAG']
+                const currentTags = parts.slice(1)
+                const newTags = [...currentTags, tag.abbreviation || 'TAG']
                 const newFormattedText = `${originalText}/${newTags.join('/')}`
 
                 existingElement.textContent = newFormattedText
