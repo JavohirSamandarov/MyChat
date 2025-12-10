@@ -207,6 +207,122 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         normalizeRef.current = normalizeAnnotatedElements
     }, [normalizeAnnotatedElements])
 
+    const insertAutoBreakAfterSentence = useCallback(
+        (element: HTMLElement, dotInsideElement: boolean) => {
+            if (!editorRef.current || !element) return
+
+            const createBreakElement = () => {
+                const br = document.createElement('br')
+                br.dataset.autoBreak = 'true'
+                return br
+            }
+
+            if (dotInsideElement) {
+                let sibling: ChildNode | null = element.nextSibling
+
+                while (sibling) {
+                    if (
+                        sibling.nodeType === Node.ELEMENT_NODE &&
+                        (sibling as HTMLElement).tagName === 'BR'
+                    ) {
+                        const brElement = sibling as HTMLElement
+                        if (brElement.dataset.autoBreak === 'true') {
+                            return
+                        }
+                        break
+                    }
+
+                    if (sibling.nodeType === Node.TEXT_NODE) {
+                        const textNode = sibling as Text
+                        const text = textNode.textContent || ''
+                        const spaceMatch = text.match(/^ +/)
+                        if (spaceMatch) {
+                            const spacesLength = spaceMatch[0].length
+                            textNode.textContent = text.slice(spacesLength)
+                            const breakElement = createBreakElement()
+                            element.parentNode?.insertBefore(
+                                breakElement,
+                                textNode
+                            )
+                            return
+                        }
+
+                        if (!text.length) {
+                            const removable = sibling
+                            sibling = sibling.nextSibling
+                            removable.parentNode?.removeChild(removable)
+                            continue
+                        }
+                    }
+
+                    break
+                }
+
+                return
+            }
+
+            const walker = document.createTreeWalker(
+                editorRef.current,
+                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                null
+            )
+            walker.currentNode = element
+
+            let currentNode: Node | null = element
+            while ((currentNode = walker.nextNode())) {
+                if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                    const el = currentNode as HTMLElement
+                    if (
+                        el.tagName === 'BR' &&
+                        el.dataset.autoBreak === 'true'
+                    ) {
+                        return
+                    }
+                    continue
+                }
+
+                const textNode = currentNode as Text
+                const text = textNode.textContent || ''
+                const match = text.match(/\. +/)
+                if (!match || match.index === undefined) {
+                    continue
+                }
+
+                const breakIndex = match.index + match[0].length
+                const before = text.slice(0, breakIndex)
+                const after = text.slice(breakIndex)
+
+                if (
+                    textNode.nextSibling &&
+                    textNode.nextSibling.nodeType === Node.ELEMENT_NODE
+                ) {
+                    const nextElement = textNode.nextSibling as HTMLElement
+                    if (
+                        nextElement.tagName === 'BR' &&
+                        nextElement.dataset.autoBreak === 'true'
+                    ) {
+                        return
+                    }
+                }
+
+                textNode.textContent = before
+                const breakElement = createBreakElement()
+                const parent = textNode.parentNode
+                if (!parent) {
+                    return
+                }
+                const referenceNode = textNode.nextSibling
+                parent.insertBefore(breakElement, referenceNode)
+                if (after.length) {
+                    const afterNode = document.createTextNode(after)
+                    parent.insertBefore(afterNode, referenceNode)
+                }
+                return
+            }
+        },
+        []
+    )
+
     useEffect(() => {
         setForceCreate(false)
     }, [textId])
@@ -928,7 +1044,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         if (!selectedRange) return
 
         const selectedText = selectedRange.toString()
-        if (selectedText.trim().length === 0) return
+        const trimmedSelection = selectedText.trim()
+        if (trimmedSelection.length === 0) return
+        const selectionEndsWithPeriod = trimmedSelection.endsWith('.')
 
         return new Promise((resolve) => {
             let targetElement: Node | null = selectedRange.startContainer
@@ -952,6 +1070,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const currentText = existingElement.textContent || ''
                 const parts = currentText.split('/')
                 const originalText = parts[0]
+                const normalizedOriginal = originalText.replace(/\+/g, ' ')
+                const originalEndsWithPeriod =
+                    normalizedOriginal.trim().endsWith('.')
 
                 const newTags = [...parts.slice(1), tag.abbreviation || 'TAG']
                 const newFormattedText = `${originalText}/${newTags.join('/')}`
@@ -979,6 +1100,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 existingElement.title = `${existingTitle}, ${
                     tag.name_tag || 'Tag'
                 } (${tag.abbreviation || 'N/A'})`
+                insertAutoBreakAfterSentence(
+                    existingElement,
+                    originalEndsWithPeriod
+                )
             } else {
                 const span = document.createElement('span')
                 span.className = 'annotated-text'
@@ -1024,6 +1149,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 span.textContent = formattedText
                 selectedRange.deleteContents()
                 selectedRange.insertNode(span)
+                insertAutoBreakAfterSentence(span, selectionEndsWithPeriod)
             }
 
             checkContent()
