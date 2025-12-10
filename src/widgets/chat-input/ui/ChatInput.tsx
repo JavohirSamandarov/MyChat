@@ -883,94 +883,119 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
     }, [editorTags.length, editorTagsLoading, loadTags])
 
-    // Teglarni filterlash
-    const filteredTags = tagSource
-        .filter((tag) => {
-            if (!resolvedLanguageId) return false
-            return tag.language.id === resolvedLanguageId
-        })
-        .filter(
-            (tag) =>
-                tag.name_tag
-                    ?.toLowerCase()
-                    .includes(searchTerm.toLowerCase()) ||
-                tag.abbreviation
-                    ?.toLowerCase()
-                    .includes(searchTerm.toLowerCase())
+    const languageTags = useMemo(() => {
+        if (!resolvedLanguageId) {
+            return []
+        }
+        return tagSource.filter(
+            (tag) => tag.language.id === resolvedLanguageId
         )
+    }, [resolvedLanguageId, tagSource])
+
+    // Teglarni filterlash
+    const filteredTags = useMemo(() => {
+        if (!languageTags.length) {
+            return []
+        }
+        const searchValue = searchTerm.toLowerCase()
+        if (!searchValue.length) {
+            return languageTags
+        }
+        return languageTags.filter(
+            (tag) =>
+                tag.name_tag?.toLowerCase().includes(searchValue) ||
+                tag.abbreviation?.toLowerCase().includes(searchValue)
+        )
+    }, [languageTags, searchTerm])
 
     // Statistikani yangilash funksiyasi
     // Matn tanlanganida
     const handleTextSelection = useCallback(() => {
-        if (!resolvedLanguageId || filteredTags.length === 0) {
-            console.log(
-                'Language not selected or no tags available - menu blocked'
-            )
+        if (!resolvedLanguageId) {
+            console.log('Language not selected - menu blocked')
             return
         }
 
         const selection = window.getSelection()
-        if (!selection || selection.toString().length === 0) {
+        if (!selection || selection.rangeCount === 0) {
+            return
+        }
+
+        if (!editorRef.current?.contains(selection.anchorNode)) {
+            return
+        }
+
+        const range = selection.getRangeAt(0)
+        let targetElement: Node | ParentNode | null = selection.anchorNode
+
+        if (targetElement && targetElement.nodeType === Node.TEXT_NODE) {
+            targetElement = targetElement.parentElement
+        }
+
+        if (
+            targetElement &&
+            targetElement instanceof HTMLElement &&
+            targetElement.classList?.contains('annotated-text')
+        ) {
+            const annotationRange = document.createRange()
+            annotationRange.selectNodeContents(targetElement)
+            selection.removeAllRanges()
+            selection.addRange(annotationRange)
+            setSelectedRange(annotationRange.cloneRange())
+            setSelectedAnnotatedElement(targetElement)
+            setCurrentSelection('')
+            setShowEditMenu(true)
+            setShowTagMenu(false)
+            setShowImportExport(false)
+            setSearchTerm('')
+
+            const rect = targetElement.getBoundingClientRect()
+            setMenuPosition({
+                x: rect.right + window.scrollX,
+                y: rect.bottom + window.scrollY + 10,
+            })
+            return
+        }
+
+        if (languageTags.length === 0) {
+            console.log('No tags available - menu blocked')
             return
         }
 
         const selectedText = selection.toString().trim()
-        if (
-            selectedText.length > 0 &&
-            editorRef.current?.contains(selection.anchorNode)
-        ) {
-            let targetElement: Node | ParentNode | null = selection.anchorNode
-
-            if (targetElement && targetElement.nodeType === Node.TEXT_NODE) {
-                targetElement = targetElement.parentElement
-            }
-
-            if (
-                targetElement &&
-                targetElement instanceof HTMLElement &&
-                targetElement.classList?.contains('annotated-text')
-            ) {
-                setSelectedAnnotatedElement(targetElement)
-                setShowEditMenu(true)
-
-                const range = selection.getRangeAt(0)
-                const rect = range.getBoundingClientRect()
-                setMenuPosition({
-                    x: rect.right + window.scrollX,
-                    y: rect.bottom + window.scrollY + 10,
-                })
-                return
-            }
-
-            const range = selection.getRangeAt(0)
-            setSelectedRange(range.cloneRange())
-            setCurrentSelection(selectedText)
-
-            const preSelectionRange = range.cloneRange()
-            preSelectionRange.selectNodeContents(editorRef.current!)
-            preSelectionRange.setEnd(range.startContainer, range.startOffset)
-            const start = preSelectionRange.toString().length
-            const end = start + selectedText.length
-
-            handleTextSelect(selectedText, start, end)
-
-            const rect = range.getBoundingClientRect()
-            const viewportWidth = window.innerWidth
-            const menuWidth = 280
-
-            let menuX = rect.right + window.scrollX
-            if (menuX + menuWidth > viewportWidth) {
-                menuX = rect.left + window.scrollX - menuWidth
-            }
-
-            setMenuPosition({
-                x: menuX,
-                y: rect.bottom + window.scrollY + 10,
-            })
-            setShowTagMenu(true)
-            setSearchTerm('')
+        if (selectedText.length === 0) {
+            return
         }
-    }, [handleTextSelect, resolvedLanguageId, filteredTags.length])
+
+        setSelectedAnnotatedElement(null)
+        const rangeClone = range.cloneRange()
+        setSelectedRange(rangeClone)
+        setCurrentSelection(selectedText)
+
+        const preSelectionRange = range.cloneRange()
+        preSelectionRange.selectNodeContents(editorRef.current!)
+        preSelectionRange.setEnd(range.startContainer, range.startOffset)
+        const start = preSelectionRange.toString().length
+        const end = start + selectedText.length
+
+        handleTextSelect(selectedText, start, end)
+
+        const rect = range.getBoundingClientRect()
+        const viewportWidth = window.innerWidth
+        const menuWidth = 280
+
+        let menuX = rect.right + window.scrollX
+        if (menuX + menuWidth > viewportWidth) {
+            menuX = rect.left + window.scrollX - menuWidth
+        }
+
+        setMenuPosition({
+            x: menuX,
+            y: rect.bottom + window.scrollY + 10,
+        })
+        setShowTagMenu(true)
+        setSearchTerm('')
+    }, [handleTextSelect, languageTags.length, resolvedLanguageId])
 
     // Annotated elementni o'chirish
     const handleRemoveTags = () => {
@@ -992,8 +1017,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         const newSelection = window.getSelection()
         newSelection?.removeAllRanges()
         newSelection?.addRange(newRange)
+        setSelectedRange(newRange.cloneRange())
 
-        setShowEditMenu(false)
         setSelectedAnnotatedElement(null)
         updateTagStatistics()
     }
@@ -1024,6 +1049,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             const newSelection = window.getSelection()
             newSelection?.removeAllRanges()
             newSelection?.addRange(newRange)
+            setSelectedRange(newRange.cloneRange())
 
             setSelectedAnnotatedElement(null)
         } else {
@@ -1045,33 +1071,51 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             const newSelection = window.getSelection()
             newSelection?.removeAllRanges()
             newSelection?.addRange(newRange)
+            setSelectedRange(newRange.cloneRange())
 
             setSelectedAnnotatedElement(elementToUpdate)
         }
 
-        setShowEditMenu(false)
         updateTagStatistics()
     }
 
     // Context menu
     const handleContextMenu = (e: React.MouseEvent) => {
-        if (!resolvedLanguageId || filteredTags.length === 0) {
+        const target = e.target as HTMLElement | null
+        const annotatedElement = target
+            ? (target.closest('.annotated-text') as HTMLElement | null)
+            : null
+
+        if (
+            !resolvedLanguageId ||
+            (!annotatedElement && languageTags.length === 0)
+        ) {
             e.preventDefault()
             return
         }
 
         e.preventDefault()
+
+        if (annotatedElement) {
+            const selection = window.getSelection()
+            const range = document.createRange()
+            range.selectNodeContents(annotatedElement)
+            selection?.removeAllRanges()
+            selection?.addRange(range)
+            setSelectedRange(range.cloneRange())
+        }
+
         handleTextSelection()
     }
 
     // MouseUp handler
     const handleMouseUp = useCallback(
         (e: React.MouseEvent) => {
-            if (e.button === 2 && resolvedLanguageId && filteredTags.length > 0) {
+            if (e.button === 2 && resolvedLanguageId && languageTags.length > 0) {
                 // Right-click handling
             }
         },
-        [resolvedLanguageId, filteredTags.length]
+        [languageTags.length, resolvedLanguageId]
     )
 
     // Teg tanlanganida
@@ -1081,47 +1125,52 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             showNotification(limitError, 'error')
             return
         }
+        const editingAnnotatedElement = Boolean(selectedAnnotatedElement)
         let success = true
         if (resolvedTaggedTextId) {
             success = await addAnnotation(resolvedTaggedTextId, tag.id)
         }
         if (success) {
             await formatSelectedText(tag)
-            window.getSelection()?.removeAllRanges()
-            clearSelection()
+            if (!editingAnnotatedElement) {
+                window.getSelection()?.removeAllRanges()
+                clearSelection()
 
-            setTimeout(() => {
-                if (editorRef.current) {
-                    const range = document.createRange()
-                    const selection = window.getSelection()
+                setTimeout(() => {
+                    if (editorRef.current) {
+                        const range = document.createRange()
+                        const selection = window.getSelection()
 
-                    const lastChild = editorRef.current.lastChild
+                        const lastChild = editorRef.current.lastChild
 
-                    if (lastChild) {
-                        if (lastChild.nodeType === Node.TEXT_NODE) {
-                            range.setStart(
-                                lastChild,
-                                lastChild.textContent?.length || 0
-                            )
-                            range.setEnd(
-                                lastChild,
-                                lastChild.textContent?.length || 0
-                            )
+                        if (lastChild) {
+                            if (lastChild.nodeType === Node.TEXT_NODE) {
+                                range.setStart(
+                                    lastChild,
+                                    lastChild.textContent?.length || 0
+                                )
+                                range.setEnd(
+                                    lastChild,
+                                    lastChild.textContent?.length || 0
+                                )
+                            } else {
+                                range.setStartAfter(lastChild)
+                                range.setEndAfter(lastChild)
+                            }
                         } else {
-                            range.setStartAfter(lastChild)
-                            range.setEndAfter(lastChild)
+                            range.setStart(editorRef.current, 0)
+                            range.setEnd(editorRef.current, 0)
                         }
-                    } else {
-                        range.setStart(editorRef.current, 0)
-                        range.setEnd(editorRef.current, 0)
-                    }
 
-                    range.collapse(true)
-                    selection?.removeAllRanges()
-                    selection?.addRange(range)
-                }
-                editorRef.current?.focus()
-            }, 0)
+                        range.collapse(true)
+                        selection?.removeAllRanges()
+                        selection?.addRange(range)
+                    }
+                    editorRef.current?.focus()
+                }, 0)
+            } else {
+                setShowEditMenu(true)
+            }
 
             updateTagStatistics()
         } else {
@@ -1196,6 +1245,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 existingElement.title = `${existingTitle}, ${
                     tag.name_tag || 'Tag'
                 } (${tag.abbreviation || 'N/A'})`
+
+                const reselectionRange = document.createRange()
+                reselectionRange.selectNodeContents(existingElement)
+                const reselection = window.getSelection()
+                reselection?.removeAllRanges()
+                reselection?.addRange(reselectionRange)
+                setSelectedRange(reselectionRange.cloneRange())
+                setSelectedAnnotatedElement(existingElement)
+
                 insertAutoBreakAfterSentence(
                     existingElement,
                     originalEndsWithPeriod
@@ -1245,6 +1303,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 span.textContent = formattedText
                 selectedRange.deleteContents()
                 selectedRange.insertNode(span)
+                const reselectionRange = document.createRange()
+                reselectionRange.selectNodeContents(span)
+                const reselection = window.getSelection()
+                reselection?.removeAllRanges()
+                reselection?.addRange(reselectionRange)
+                setSelectedRange(reselectionRange.cloneRange())
+                setSelectedAnnotatedElement(span)
                 insertAutoBreakAfterSentence(span, selectionEndsWithPeriod)
             }
 
@@ -1929,7 +1994,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 event.ctrlKey &&
                 event.key === ' ' &&
                 resolvedLanguageId &&
-                filteredTags.length > 0
+                languageTags.length > 0
             ) {
                 event.preventDefault()
                 handleTextSelection()
@@ -1944,7 +2009,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return () => {
             document.removeEventListener('keydown', handleKeyDown)
         }
-    }, [handleTextSelection, resolvedLanguageId, filteredTags.length])
+    }, [handleTextSelection, languageTags.length, resolvedLanguageId])
 
     // Paste handler
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -2216,7 +2281,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 )}
 
                 {/* Edit menyusi */}
-                {showEditMenu && selectedAnnotatedElement && (
+                {showEditMenu && (
                     <div
                         ref={editMenuRef}
                         className='tag-menu'
@@ -2225,89 +2290,24 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                             top: menuPosition.y,
                         }}
                     >
-                        <div
-                            style={{
-                                padding: '4px 8px',
-                                fontSize: '12px',
-                                color: '#666',
-                                borderBottom: '1px solid #eee',
-                                marginBottom: '8px',
-                            }}
-                        >
-                            Teglarni boshqarish
-                        </div>
-
-                        {getCurrentTags().map((tag) => (
-                            <button
-                                key={tag.index}
-                                onClick={() =>
-                                    handleRemoveSpecificTag(tag.index)
-                                }
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    width: '100%',
-                                    padding: '8px',
-                                    margin: '2px 0',
-                                    background: tag.color,
-                                    border: 'none',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    textAlign: 'left',
-                                    fontSize: '12px',
-                                }}
-                            >
-                                <div
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                    }}
-                                >
-                                    <div
-                                        style={{
-                                            width: '12px',
-                                            height: '12px',
-                                            borderRadius: '2px',
-                                            backgroundColor: tag.color,
-                                            marginRight: '8px',
-                                        }}
-                                    />
-                                    <div>
-                                        <div style={{ fontWeight: 'bold' }}>
-                                            {tag.name}
-                                        </div>
-                                        <div
-                                            style={{
-                                                fontSize: '10px',
-                                                color: '#666',
-                                            }}
-                                        >
-                                            {tag.abbreviation}
-                                        </div>
-                                    </div>
-                                </div>
-                                <DeleteIcon
-                                    style={{
-                                        fontSize: '16px',
-                                        color: '#ff4444',
-                                    }}
-                                />
-                            </button>
-                        ))}
-
                         <button
                             onClick={handleRemoveTags}
+                            disabled={!selectedAnnotatedElement}
                             style={{
                                 display: 'flex',
                                 alignItems: 'center',
                                 width: '100%',
                                 padding: '8px',
-                                margin: '8px 0 2px 0',
-                                background: '#ffebee',
+                                margin: '0 0 8px 0',
+                                background: selectedAnnotatedElement
+                                    ? '#ffebee'
+                                    : '#f5f5f5',
+                                opacity: selectedAnnotatedElement ? 1 : 0.6,
                                 border: 'none',
                                 borderRadius: '4px',
-                                cursor: 'pointer',
+                                cursor: selectedAnnotatedElement
+                                    ? 'pointer'
+                                    : 'not-allowed',
                                 textAlign: 'left',
                                 fontSize: '12px',
                             }}
@@ -2321,6 +2321,163 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                             />
                             Barcha teglarni o'chirish
                         </button>
+
+                        <div
+                            style={{
+                                padding: '4px 0',
+                                fontSize: '12px',
+                                color: '#666',
+                                fontWeight: 600,
+                            }}
+                        >
+                            Joriy teglar
+                        </div>
+
+                        {getCurrentTags().length > 0 ? (
+                            getCurrentTags().map((tag) => (
+                                <button
+                                    key={`${tag.index}-${tag.abbreviation}`}
+                                    onClick={() =>
+                                        handleRemoveSpecificTag(tag.index)
+                                    }
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        width: '100%',
+                                        padding: '8px',
+                                        margin: '2px 0',
+                                        background: tag.color,
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        textAlign: 'left',
+                                        fontSize: '12px',
+                                    }}
+                                >
+                                    <div
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                width: '12px',
+                                                height: '12px',
+                                                borderRadius: '2px',
+                                                backgroundColor: tag.color,
+                                                marginRight: '8px',
+                                            }}
+                                        />
+                                        <div>
+                                            <div style={{ fontWeight: 'bold' }}>
+                                                {tag.name}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    fontSize: '10px',
+                                                    color: '#666',
+                                                }}
+                                            >
+                                                {tag.abbreviation}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <DeleteIcon
+                                        style={{
+                                            fontSize: '16px',
+                                            color: '#ff4444',
+                                        }}
+                                    />
+                                </button>
+                            ))
+                        ) : (
+                            <div
+                                style={{
+                                    padding: '8px',
+                                    fontSize: '12px',
+                                    color: '#999',
+                                }}
+                            >
+                                Hali teg qo'yilmagan
+                            </div>
+                        )}
+
+                        <div
+                            style={{
+                                padding: '8px 0 4px 0',
+                                fontSize: '12px',
+                                color: '#666',
+                                fontWeight: 600,
+                            }}
+                        >
+                            Yangi teg tanlash
+                        </div>
+
+                        <div className='tags-list'>
+                            {languageTags.length > 0 ? (
+                                languageTags.map((tag: Tag, index) => (
+                                    <button
+                                        key={tag.id || `edit-${index}`}
+                                        onClick={() => handleTagSelect(tag)}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            width: '100%',
+                                            padding: '8px',
+                                            margin: '2px 0',
+                                            background: tag.color || '#f5f5f5',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
+                                            fontSize: '12px',
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                width: '12px',
+                                                height: '12px',
+                                                borderRadius: '2px',
+                                                backgroundColor:
+                                                    tag.color || '#ccc',
+                                                marginRight: '8px',
+                                            }}
+                                        />
+                                        <div>
+                                            <div
+                                                style={{
+                                                    fontWeight: 'bold',
+                                                }}
+                                            >
+                                                {tag.name_tag ||
+                                                    `Tag ${index + 1}`}
+                                            </div>
+                                            <div
+                                                style={{
+                                                    fontSize: '10px',
+                                                    color: '#666',
+                                                }}
+                                            >
+                                                {tag.abbreviation || 'N/A'}
+                                            </div>
+                                        </div>
+                                    </button>
+                                ))
+                            ) : (
+                                <div
+                                    style={{
+                                        padding: '8px',
+                                        textAlign: 'center',
+                                        color: '#666',
+                                        fontSize: '12px',
+                                    }}
+                                >
+                                    Bu tahlil turi uchun teg topilmadi
+                                </div>
+                            )}
+                        </div>
 
                         <div
                             style={{
