@@ -1218,6 +1218,22 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             return
         }
         const editingAnnotatedElement = Boolean(selectedAnnotatedElement)
+        const normalizedAbbr = tag.abbreviation?.trim()
+        if (
+            editingAnnotatedElement &&
+            selectedAnnotatedElement &&
+            normalizedAbbr
+        ) {
+            const existingText = selectedAnnotatedElement.textContent || ''
+            const existingTags = existingText.split('/').slice(1)
+            if (existingTags.includes(normalizedAbbr)) {
+                showNotification(
+                    'Bu so\'zga bu teg allaqachon qo\'yilgan',
+                    'error'
+                )
+                return
+            }
+        }
         let success = true
         if (resolvedTaggedTextId) {
             success = await addAnnotation(resolvedTaggedTextId, tag.id)
@@ -1311,7 +1327,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const originalEndsWithPeriod =
                     normalizedOriginal.trim().endsWith('.')
                 const currentTags = parts.slice(1)
-                const newTags = [...currentTags, tag.abbreviation || 'TAG']
+                const normalizedAbbr = (tag.abbreviation || '').trim()
+                if (
+                    normalizedAbbr.length > 0 &&
+                    currentTags.includes(normalizedAbbr)
+                ) {
+                    showNotification(
+                        'Bu so\'zga bu teg allaqachon qo\'yilgan',
+                        'error'
+                    )
+                    resolve()
+                    return
+                }
+                const nextTag = normalizedAbbr || 'TAG'
+                const newTags = [...currentTags, nextTag]
                 const newFormattedText = `${originalText}/${newTags.join('/')}`
 
                 existingElement.textContent = newFormattedText
@@ -1327,16 +1356,16 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         (existingElement.dataset.tagNames || '') +
                         `,${tag.name_tag}`
                 }
-                if (tag.abbreviation) {
+                if (normalizedAbbr.length > 0) {
                     existingElement.dataset.tagAbbrs =
                         (existingElement.dataset.tagAbbrs || '') +
-                        `,${tag.abbreviation}`
+                        `,${normalizedAbbr}`
                 }
 
                 const existingTitle = existingElement.title.split(')')[0]
                 existingElement.title = `${existingTitle}, ${
                     tag.name_tag || 'Tag'
-                } (${tag.abbreviation || 'N/A'})`
+                } (${normalizedAbbr || 'N/A'})`
 
                 const reselectionRange = document.createRange()
                 reselectionRange.selectNodeContents(existingElement)
