@@ -16,7 +16,17 @@ import DownloadIcon from '@mui/icons-material/Download'
 import UploadIcon from '@mui/icons-material/Upload'
 import { useEditor } from '@/features/editor/hooks/useEditor'
 import { Tag } from '@/shared/api/linguistics/linguisticsApi'
-import { Alert, Snackbar } from '@mui/material'
+import {
+    Alert,
+    Snackbar,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    TextField,
+    Button,
+    Typography,
+} from '@mui/material'
 
 const DEFAULT_ANALYSIS_TYPE = 1
 const HISTORY_LIMIT = 200
@@ -103,6 +113,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         languageId: number
         token: number
     } | null>(null)
+    const replaceHighlightsRef = useRef<HTMLElement[]>([])
+    const [isReplaceModalOpen, setIsReplaceModalOpen] = useState(false)
+    const [replaceSearchTerm, setReplaceSearchTerm] = useState('')
+    const [replaceValue, setReplaceValue] = useState('')
+    const [replaceStats, setReplaceStats] = useState({
+        total: 0,
+        currentIndex: 0,
+    })
+    const [showReplaceTagPicker, setShowReplaceTagPicker] = useState(false)
+    const replaceTagButtonRef = useRef<HTMLButtonElement | null>(null)
+    const replaceTagPickerRef = useRef<HTMLDivElement | null>(null)
     const latestStatsRef = useRef<
         Record<string, { count: number; color: string }>
     >({})
@@ -138,6 +159,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const resolvedLanguageId = languageId ?? loadedLanguageId
     const tagSource =
         availableTags !== undefined ? availableTags : editorTags
+
+    const showNotification = (
+        message: string,
+        severity: 'success' | 'error' = 'success'
+    ) => {
+        setNotification({
+            open: true,
+            message,
+            severity,
+        })
+    }
 
     const findTagByAbbreviation = useCallback(
         (abbr: string) => {
@@ -595,6 +627,529 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         applySnapshot(next)
     }, [applySnapshot])
 
+    const getReplaceOccurrences = useCallback(
+        (
+            term: string
+        ): Array<{ node: Text; start: number; length: number }> => {
+            if (!editorRef.current) {
+                return []
+            }
+            const searchValue = term
+            if (!searchValue.length) {
+                return []
+            }
+
+            const walker = document.createTreeWalker(
+                editorRef.current,
+                NodeFilter.SHOW_TEXT
+            )
+            const occurrences: Array<{
+                node: Text
+                start: number
+                length: number
+            }> = []
+
+            let currentNode = walker.nextNode()
+            while (currentNode) {
+                const textNode = currentNode as Text
+                const text = textNode.textContent || ''
+                let searchIndex = 0
+                while (searchIndex <= text.length - searchValue.length) {
+                    const foundIndex = text.indexOf(searchValue, searchIndex)
+                    if (foundIndex === -1) {
+                        break
+                    }
+                    occurrences.push({
+                        node: textNode,
+                        start: foundIndex,
+                        length: searchValue.length,
+                    })
+                    searchIndex = foundIndex + searchValue.length
+                }
+                currentNode = walker.nextNode()
+            }
+
+            return occurrences
+        },
+        []
+    )
+
+    const updateReplaceStats = useCallback(
+        (
+            term: string
+        ): {
+            matches: Array<{ node: Text; start: number; length: number }>
+            activeIndex: number
+        } => {
+            const normalized = term.trim()
+            if (!normalized.length) {
+                setReplaceStats({
+                    total: 0,
+                    currentIndex: 0,
+                })
+                return { matches: [], activeIndex: 0 }
+            }
+
+            const matches = getReplaceOccurrences(normalized)
+            if (matches.length === 0) {
+                setReplaceStats({
+                    total: 0,
+                    currentIndex: 0,
+                })
+                return { matches: [], activeIndex: 0 }
+            }
+
+            const selection = window.getSelection()
+            const range =
+                selection && selection.rangeCount > 0
+                    ? selection.getRangeAt(0)
+                    : null
+
+            let activeIndex = 0
+            if (range) {
+                matches.forEach((match, index) => {
+                    const matchRange = document.createRange()
+                    matchRange.setStart(match.node, match.start)
+                    matchRange.setEnd(match.node, match.start + match.length)
+
+                    const startsInside =
+                        range.compareBoundaryPoints(
+                            Range.START_TO_START,
+                            matchRange
+                        ) >= 0
+                    const endsInside =
+                        range.compareBoundaryPoints(
+                            Range.END_TO_END,
+                            matchRange
+                        ) <= 0
+
+                    if (startsInside && endsInside) {
+                        activeIndex = index + 1
+                    }
+                })
+            }
+
+            if (!activeIndex) {
+                activeIndex = 1
+            }
+
+            setReplaceStats({
+                total: matches.length,
+                currentIndex: activeIndex,
+            })
+            return { matches, activeIndex }
+        },
+        [getReplaceOccurrences]
+    )
+
+    const clearReplaceHighlights = useCallback(() => {
+        if (!replaceHighlightsRef.current.length) {
+            return
+        }
+        replaceHighlightsRef.current.forEach((highlight) => {
+            const parent = highlight.parentNode
+            if (!parent) {
+                return
+            }
+            const textContent = highlight.textContent || ''
+            const textNode = document.createTextNode(textContent)
+            parent.replaceChild(textNode, highlight)
+            if (parent instanceof HTMLElement) {
+                parent.normalize()
+            }
+        })
+        replaceHighlightsRef.current = []
+    }, [])
+
+    const applyReplaceHighlights = useCallback(
+        (term: string) => {
+            if (!editorRef.current) {
+                return
+            }
+            const searchValue = term
+            if (!searchValue.length) {
+                return
+            }
+            const walker = document.createTreeWalker(
+                editorRef.current,
+                NodeFilter.SHOW_TEXT
+            )
+            let currentNode = walker.nextNode()
+            let matchCounter = 0
+            while (currentNode) {
+                const textNode = currentNode as Text
+                const text = textNode.textContent || ''
+                if (text.includes(searchValue)) {
+                    const parts = text.split(searchValue)
+                    if (parts.length > 1) {
+                        const fragment = document.createDocumentFragment()
+                        parts.forEach((part, index) => {
+                            if (part.length) {
+                                fragment.appendChild(
+                                    document.createTextNode(part)
+                                )
+                            }
+                            if (index < parts.length - 1) {
+                                const highlight = document.createElement('span')
+                                highlight.className = 'replace-highlight'
+                                highlight.textContent = searchValue
+                                matchCounter += 1
+                                highlight.dataset.replaceIndex =
+                                    matchCounter.toString()
+                                fragment.appendChild(highlight)
+                                replaceHighlightsRef.current.push(highlight)
+                            }
+                        })
+                        const parent = textNode.parentNode
+                        parent?.replaceChild(fragment, textNode)
+                    }
+                }
+                currentNode = walker.nextNode()
+            }
+        },
+        []
+    )
+
+    const setActiveReplaceHighlight = useCallback((index: number) => {
+        replaceHighlightsRef.current.forEach((highlight) => {
+            if (Number(highlight.dataset.replaceIndex) === index) {
+                highlight.classList.add('replace-highlight-active')
+            } else {
+                highlight.classList.remove('replace-highlight-active')
+            }
+        })
+    }, [])
+
+    const replaceAllOccurrences = useCallback(
+        (term: string, replacement: string): number => {
+            if (!editorRef.current) {
+                return 0
+            }
+            const search = term.trim()
+            if (!search.length) {
+                return 0
+            }
+
+            const walker = document.createTreeWalker(
+                editorRef.current,
+                NodeFilter.SHOW_TEXT
+            )
+            let currentNode = walker.nextNode()
+            const pendingUpdates: Array<{ node: Text; text: string }> = []
+            let total = 0
+
+            while (currentNode) {
+                const textNode = currentNode as Text
+                const text = textNode.textContent || ''
+                if (text.includes(search)) {
+                    const parts = text.split(search)
+                    if (parts.length > 1) {
+                        const newText = parts.join(replacement)
+                        pendingUpdates.push({ node: textNode, text: newText })
+                        total += parts.length - 1
+                    }
+                }
+                currentNode = walker.nextNode()
+            }
+
+            pendingUpdates.forEach(({ node, text }) => {
+                node.textContent = text
+            })
+
+            return total
+        },
+        []
+    )
+
+    const convertTaggedTokensToAnnotations = useCallback(() => {
+        if (!editorRef.current) {
+            return
+        }
+
+        const walker = document.createTreeWalker(
+            editorRef.current,
+            NodeFilter.SHOW_TEXT
+        )
+
+        let currentNode = walker.nextNode()
+        while (currentNode) {
+            const textNode = currentNode as Text
+            const parentElement = textNode.parentElement
+            if (parentElement?.classList.contains('annotated-text')) {
+                currentNode = walker.nextNode()
+                continue
+            }
+
+            const text = textNode.textContent || ''
+            if (!text.includes('/')) {
+                currentNode = walker.nextNode()
+                continue
+            }
+
+            const parts = text.split(/(\s+)/)
+            const fragment = document.createDocumentFragment()
+            let replaced = false
+
+            parts.forEach((segment) => {
+                if (!segment) {
+                    return
+                }
+
+                if (/^\s+$/.test(segment) || !segment.includes('/')) {
+                    fragment.appendChild(document.createTextNode(segment))
+                    return
+                }
+
+                const tokenParts = segment.split('/')
+                const rawWord = tokenParts[0]
+                const abbreviations = tokenParts.slice(1).filter(Boolean)
+
+                if (!rawWord || !abbreviations.length) {
+                    fragment.appendChild(document.createTextNode(segment))
+                    return
+                }
+
+                const span = document.createElement('span')
+                span.className = 'annotated-text'
+                span.style.color = '#000'
+                span.style.padding = '2px 6px'
+                span.style.borderRadius = '4px'
+                span.style.margin = '0 2px'
+                span.style.display = 'inline-block'
+                span.style.fontSize = 'inherit'
+                span.style.fontWeight = '600'
+                span.style.cursor = 'pointer'
+
+                const primaryAbbr = abbreviations[0]
+                const primaryColor = getTagColor(primaryAbbr)
+                span.dataset.primaryTag = primaryAbbr
+                span.dataset.primaryColor = primaryColor
+                span.style.backgroundColor = primaryColor
+
+                const tagNames: string[] = []
+                const tagIds: string[] = []
+
+                abbreviations.forEach((abbr) => {
+                    const info = findTagByAbbreviation(abbr)
+                    if (info?.name_tag) {
+                        tagNames.push(info.name_tag)
+                    }
+                    if (info?.id) {
+                        tagIds.push(info.id.toString())
+                    }
+                })
+
+                if (tagNames.length) {
+                    span.dataset.tagNames = tagNames.join(',')
+                }
+                if (tagIds.length) {
+                    span.dataset.tagIds = tagIds.join(',')
+                }
+                span.dataset.tagAbbrs = abbreviations.join(',')
+
+                const title = abbreviations
+                    .map((abbr) => {
+                        const info = findTagByAbbreviation(abbr)
+                        return info
+                            ? `${info.name_tag} (${abbr})`
+                            : abbr
+                    })
+                    .join(', ')
+                span.title = title
+
+                span.textContent = `${rawWord}/${abbreviations.join('/')}`
+                applyPrimaryColor(span, primaryAbbr)
+
+                fragment.appendChild(span)
+                replaced = true
+            })
+
+            if (replaced) {
+                textNode.parentNode?.replaceChild(fragment, textNode)
+            }
+
+            currentNode = walker.nextNode()
+        }
+    }, [applyPrimaryColor, findTagByAbbreviation, getTagColor])
+
+    const openReplaceModal = useCallback(() => {
+        const selection = window.getSelection()
+        const selectedText = selection?.toString() || ''
+        const sanitized = selectedText.trim()
+        setIsReplaceModalOpen(true)
+        if (sanitized.length) {
+            setReplaceSearchTerm(sanitized)
+            setReplaceValue(sanitized)
+            setTimeout(() => {
+                updateReplaceStats(sanitized)
+            }, 0)
+        } else {
+            setTimeout(() => {
+                updateReplaceStats(replaceSearchTerm)
+            }, 0)
+        }
+    }, [replaceSearchTerm, updateReplaceStats])
+
+    const handleCloseReplaceModal = useCallback(() => {
+        setIsReplaceModalOpen(false)
+        setShowReplaceTagPicker(false)
+        setReplaceStats({
+            total: 0,
+            currentIndex: 0,
+        })
+        clearReplaceHighlights()
+    }, [clearReplaceHighlights])
+
+    const handleReplaceAll = useCallback(() => {
+        const search = replaceSearchTerm.trim()
+        if (!search.length) {
+            showNotification('Qidirish uchun so\'z kiriting', 'error')
+            return
+        }
+        clearReplaceHighlights()
+        const replacements = replaceAllOccurrences(search, replaceValue)
+        if (!replacements) {
+            showNotification('Mos keladigan so\'z topilmadi', 'error')
+            return
+        }
+        convertTaggedTokensToAnnotations()
+        checkContent()
+        updateTagStatistics()
+        captureSnapshot()
+        showNotification(
+            `${replacements} ta o'zgarish bajarildi`,
+            'success'
+        )
+        setIsReplaceModalOpen(false)
+    }, [
+        captureSnapshot,
+        checkContent,
+        clearReplaceHighlights,
+        convertTaggedTokensToAnnotations,
+        replaceAllOccurrences,
+        replaceSearchTerm,
+        replaceValue,
+        updateTagStatistics,
+    ])
+
+    const handleReplaceTagSelect = useCallback(
+        (tag: Tag) => {
+            const abbr = tag.abbreviation?.trim()
+            if (!abbr) {
+                return
+            }
+            setReplaceValue((prev) => {
+                const trimmed = prev.trim()
+                const parts = trimmed.length ? trimmed.split('/') : []
+                const existingTags = parts.length > 1 ? parts.slice(1) : []
+
+                if (existingTags.includes(abbr)) {
+                    showNotification('Bu teg allaqachon qo\'yilgan', 'error')
+                    return prev
+                }
+
+                if (
+                    Number.isFinite(normalizedMaxTagsCount) &&
+                    normalizedMaxTagsCount >= 0 &&
+                    existingTags.length >= normalizedMaxTagsCount
+                ) {
+                    const limitMessage =
+                        normalizedMaxTagsCount === 0
+                            ? "Bu tahlil turida teg qo'shish cheklangan."
+                            : `Bir so'zga faqat ${normalizedMaxTagsCount} tag qo'yish mumkin.`
+                    showNotification(limitMessage, 'error')
+                    return prev
+                }
+
+                if (!trimmed.length) {
+                    return abbr
+                }
+                return `${trimmed}/${abbr}`
+            })
+        },
+        [normalizedMaxTagsCount, showNotification]
+    )
+
+    useEffect(() => {
+        clearReplaceHighlights()
+        if (!isReplaceModalOpen) {
+            updateReplaceStats('')
+            setShowReplaceTagPicker(false)
+            return
+        }
+
+        const normalized = replaceSearchTerm.trim()
+        const { matches, activeIndex } = updateReplaceStats(normalized)
+        if (!normalized.length || !matches.length) {
+            return
+        }
+
+        applyReplaceHighlights(normalized)
+        setActiveReplaceHighlight(activeIndex)
+    }, [
+        applyReplaceHighlights,
+        clearReplaceHighlights,
+        isReplaceModalOpen,
+        replaceSearchTerm,
+        setActiveReplaceHighlight,
+        updateReplaceStats,
+    ])
+
+    useEffect(() => {
+        return () => {
+            clearReplaceHighlights()
+        }
+    }, [clearReplaceHighlights])
+
+    useEffect(() => {
+        if (!isReplaceModalOpen) {
+            return
+        }
+
+        const handleSelectionChange = () => {
+            const selection = window.getSelection()
+            if (!selection) {
+                return
+            }
+            let node = selection.anchorNode
+            if (node && node.nodeType === Node.TEXT_NODE) {
+                node = node.parentElement
+            }
+            const highlight =
+                node instanceof HTMLElement
+                    ? (node.closest('.replace-highlight') as HTMLElement | null)
+                    : null
+            const index = highlight?.dataset.replaceIndex
+            if (index) {
+                const numericIndex = Number(index)
+                setReplaceStats((prev) =>
+                    prev.currentIndex === numericIndex
+                        ? prev
+                        : {
+                              ...prev,
+                              currentIndex: numericIndex,
+                          }
+                )
+                setActiveReplaceHighlight(numericIndex)
+            }
+        }
+
+        document.addEventListener('selectionchange', handleSelectionChange)
+        return () => {
+            document.removeEventListener(
+                'selectionchange',
+                handleSelectionChange
+            )
+        }
+    }, [isReplaceModalOpen, setActiveReplaceHighlight])
+
+    useEffect(() => {
+        if (!isReplaceModalOpen) {
+            return
+        }
+        setActiveReplaceHighlight(replaceStats.currentIndex)
+    }, [isReplaceModalOpen, replaceStats.currentIndex, setActiveReplaceHighlight])
+
     const parseMetadata = (
         metadata: unknown
     ): Record<string, unknown> | null => {
@@ -730,18 +1285,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         },
         [tagContextMap]
     )
-
-    // Show notification
-    const showNotification = (
-        message: string,
-        severity: 'success' | 'error' = 'success'
-    ) => {
-        setNotification({
-            open: true,
-            message,
-            severity,
-        })
-    }
 
     const getTagLimitError = useCallback((): string | null => {
         if (!selectedRange) {
@@ -965,6 +1508,26 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         hasContent,
         pendingImportSave,
     ])
+
+    useEffect(() => {
+        if (!showReplaceTagPicker) {
+            return
+        }
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as Node
+            if (
+                replaceTagPickerRef.current?.contains(target) ||
+                replaceTagButtonRef.current?.contains(target)
+            ) {
+                return
+            }
+            setShowReplaceTagPicker(false)
+        }
+        document.addEventListener('mousedown', handleClickOutside)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+        }
+    }, [showReplaceTagPicker])
 
     // Teglarni yuklash
     useEffect(() => {
@@ -1568,6 +2131,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 handleRedo()
                 return
             }
+
+            if (key === 'h') {
+                e.preventDefault()
+                e.stopPropagation()
+                openReplaceModal()
+                return
+            }
         }
     }
 
@@ -2149,6 +2719,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 languageTags.length > 0
             ) {
                 event.preventDefault()
+                event.stopPropagation()
                 handleTextSelection()
             }
 
@@ -2179,6 +2750,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     return
                 }
                 event.preventDefault()
+                event.stopPropagation()
                 if (event.shiftKey) {
                     handleRedo()
                 } else {
@@ -2192,7 +2764,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     return
                 }
                 event.preventDefault()
+                event.stopPropagation()
                 handleRedo()
+                return
+            }
+
+            if ((event.ctrlKey || event.metaKey) && key === 'h') {
+                if (!shouldHandleUndoRedo()) {
+                    return
+                }
+                event.preventDefault()
+                event.stopPropagation()
+                openReplaceModal()
             }
         }
 
@@ -2204,6 +2787,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         handleRedo,
         handleTextSelection,
         handleUndo,
+        openReplaceModal,
         languageTags.length,
         resolvedLanguageId,
     ])
@@ -2770,6 +3354,126 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     {notification.message}
                 </Alert>
             </Snackbar>
+
+            <Dialog
+                open={isReplaceModalOpen}
+                onClose={handleCloseReplaceModal}
+                fullWidth
+                maxWidth='sm'
+            >
+                <DialogTitle>Replace</DialogTitle>
+                <DialogContent dividers>
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        label='Find'
+                        size='small'
+                        value={replaceSearchTerm}
+                        onChange={(event) =>
+                            setReplaceSearchTerm(event.target.value)
+                        }
+                        InputProps={{
+                            endAdornment: (
+                                <Typography
+                                    variant='caption'
+                                    color='text.secondary'
+                                >
+                                    {replaceStats.total
+                                        ? `${replaceStats.currentIndex}/${replaceStats.total}`
+                                        : '0/0'}
+                                </Typography>
+                            ),
+                        }}
+                    />
+
+                    <TextField
+                        fullWidth
+                        margin='normal'
+                        label='Replace with'
+                        size='small'
+                        value={replaceValue}
+                        onChange={(event) =>
+                            setReplaceValue(event.target.value)
+                        }
+                        InputProps={{
+                            endAdornment: (
+                                <Button
+                                    size='small'
+                                    variant='outlined'
+                                    ref={replaceTagButtonRef}
+                                    onClick={() =>
+                                        setShowReplaceTagPicker(
+                                            (prev) => !prev
+                                        )
+                                    }
+                                    disabled={!languageTags.length}
+                                >
+                                    Tags
+                                </Button>
+                            ),
+                        }}
+                    />
+                    {showReplaceTagPicker && (
+                        <div
+                            ref={replaceTagPickerRef}
+                            className='replace-tag-picker'
+                        >
+                            {languageTags.length ? (
+                                languageTags.map((tag: Tag, index) => (
+                                    <button
+                                        key={tag.id || `replace-tag-${index}`}
+                                        type='button'
+                                        onClick={() =>
+                                            handleReplaceTagSelect(tag)
+                                        }
+                                    >
+                                        <span
+                                            style={{
+                                                width: 12,
+                                                height: 12,
+                                                borderRadius: 2,
+                                                backgroundColor:
+                                                    tag.color || '#ccc',
+                                                display: 'inline-block',
+                                                marginRight: 8,
+                                            }}
+                                        />
+                                        <span>
+                                            <strong>
+                                                {tag.name_tag ||
+                                                    `Tag ${index + 1}`}
+                                            </strong>
+                                            <span
+                                                style={{
+                                                    fontSize: 11,
+                                                    color: '#666',
+                                                    marginLeft: 6,
+                                                }}
+                                            >
+                                                {tag.abbreviation || 'N/A'}
+                                            </span>
+                                        </span>
+                                    </button>
+                                ))
+                            ) : (
+                                <div className='replace-tag-picker__empty'>
+                                    Bu tahlil turi uchun teg topilmadi
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseReplaceModal}>Cancel</Button>
+                    <Button
+                        onClick={handleReplaceAll}
+                        variant='contained'
+                        disabled={!replaceSearchTerm.trim().length}
+                    >
+                        Replace
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </div>
     )
 }

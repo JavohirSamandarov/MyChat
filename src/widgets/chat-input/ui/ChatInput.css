@@ -346,3 +346,54 @@
 .import-export-note small {
     opacity: 0.7;
 }
+
+.replace-highlight {
+    background-color: rgba(255, 235, 59, 0.6);
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 1px;
+}
+
+.replace-highlight-active {
+    background-color: rgba(255, 213, 79, 0.9);
+    outline: 1px solid #ff9800;
+}
+
+.replace-tag-picker {
+    margin-top: 8px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+    background: #fff;
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.replace-tag-picker button {
+    border: none;
+    border-radius: 6px;
+    background: #f5f5f5;
+    padding: 6px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    gap: 6px;
+    transition: background 0.2s ease;
+    text-align: left;
+}
+
+.replace-tag-picker button:hover {
+    background: #e0e0e0;
+}
+
+.replace-tag-picker__empty {
+    padding: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: #777;
+}
