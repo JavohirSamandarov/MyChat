@@ -19,6 +19,7 @@ import { Tag } from '@/shared/api/linguistics/linguisticsApi'
 import { Alert, Snackbar } from '@mui/material'
 
 const DEFAULT_ANALYSIS_TYPE = 1
+const HISTORY_LIMIT = 200
 
 interface SavedTextPayload {
     id: number
@@ -105,6 +106,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const latestStatsRef = useRef<
         Record<string, { count: number; color: string }>
     >({})
+    const undoStackRef = useRef<string[]>([])
+    const redoStackRef = useRef<string[]>([])
+    const isRestoringHistoryRef = useRef(false)
 
     const containerRef = useRef<HTMLDivElement>(null)
     const editorRef = useRef<HTMLDivElement>(null)
@@ -503,6 +507,94 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         onStatisticsUpdate?.(newStats)
     }, [findTagByAbbreviation, onStatisticsUpdate, tagSource])
 
+    const checkContent = useCallback(() => {
+        if (editorRef.current) {
+            const hasText = editorRef.current.innerText.trim().length > 0
+            setHasContent(hasText)
+        }
+    }, [])
+
+    const focusEditorAtEnd = useCallback(() => {
+        if (!editorRef.current) return
+        editorRef.current.focus()
+        const selection = window.getSelection()
+        if (!selection) return
+        const range = document.createRange()
+        range.selectNodeContents(editorRef.current)
+        range.collapse(false)
+        selection.removeAllRanges()
+        selection.addRange(range)
+    }, [])
+
+    const initializeHistory = useCallback(() => {
+        if (!editorRef.current) return
+        undoStackRef.current = [editorRef.current.innerHTML || '']
+        redoStackRef.current = []
+    }, [])
+
+    const captureSnapshot = useCallback(() => {
+        if (!editorRef.current || isRestoringHistoryRef.current) return
+        const html = editorRef.current.innerHTML
+        const stack = undoStackRef.current
+        if (!stack.length) {
+            stack.push(html)
+            return
+        }
+        if (stack[stack.length - 1] === html) {
+            return
+        }
+        stack.push(html)
+        if (stack.length > HISTORY_LIMIT) {
+            stack.shift()
+        }
+        redoStackRef.current = []
+    }, [])
+
+    const applySnapshot = useCallback(
+        (html: string) => {
+            if (!editorRef.current) return
+            isRestoringHistoryRef.current = true
+            editorRef.current.innerHTML = html
+            normalizeRef.current?.()
+            setSelectedRange(null)
+            setSelectedAnnotatedElement(null)
+            checkContent()
+            updateTagStatistics()
+            focusEditorAtEnd()
+            requestAnimationFrame(() => {
+                isRestoringHistoryRef.current = false
+            })
+        },
+        [checkContent, focusEditorAtEnd, updateTagStatistics]
+    )
+
+    const handleUndo = useCallback(() => {
+        const stack = undoStackRef.current
+        if (stack.length <= 1) {
+            return
+        }
+        const current = stack.pop()
+        if (!current) {
+            return
+        }
+        redoStackRef.current.push(current)
+        const previous = stack[stack.length - 1] ?? ''
+        applySnapshot(previous)
+    }, [applySnapshot])
+
+    const handleRedo = useCallback(() => {
+        const redoStack = redoStackRef.current
+        if (!redoStack.length) {
+            return
+        }
+        const next = redoStack.pop()
+        if (!next) {
+            return
+        }
+        undoStackRef.current.push(next)
+        applySnapshot(next)
+    }, [applySnapshot])
+
     const parseMetadata = (
         metadata: unknown
     ): Record<string, unknown> | null => {
@@ -719,14 +811,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return null
     }, [normalizedMaxTagsCount, selectedRange])
 
-    // Content bor-yo'qligini tekshirish
-    const checkContent = useCallback(() => {
-        if (editorRef.current) {
-            const hasText = editorRef.current.innerText.trim().length > 0
-            setHasContent(hasText)
-        }
-    }, [])
-
     useEffect(() => {
         const loadText = async () => {
             if (textId) {
@@ -785,6 +869,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         }
 
                         checkContent()
+                        initializeHistory()
                         setTimeout(() => {
                             updateTagStatistics()
                         }, 0)
@@ -808,13 +893,18 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     latestStatsRef.current = {}
                     onStatisticsUpdate?.({})
                     updateTagStatistics()
+                    initializeHistory()
                 }
                 setLoadedLanguageId(undefined)
             }
         }
 
         loadText()
-    }, [textId])
+    }, [initializeHistory, textId])
+
+    useEffect(() => {
+        initializeHistory()
+    }, [initializeHistory])
 
     useEffect(() => {
         if (textId) {
@@ -1021,6 +1111,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         setSelectedAnnotatedElement(null)
         updateTagStatistics()
+        captureSnapshot()
     }
 
     // Alohida tegni o'chirish
@@ -1077,6 +1168,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
 
         updateTagStatistics()
+        captureSnapshot()
     }
 
     // Context menu
@@ -1314,6 +1406,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             }
 
             checkContent()
+            captureSnapshot()
             resolve()
         })
     }
@@ -1352,6 +1445,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 targetElement = previousSibling as HTMLElement
             }
         }
+
+        let updated = false
 
         if (targetElement) {
             e.preventDefault()
@@ -1404,23 +1499,46 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 newSelection?.removeAllRanges()
                 newSelection?.addRange(newRange)
             }
+
+            updated = true
         }
-        updateTagStatistics()
+
+        if (updated) {
+            updateTagStatistics()
+            captureSnapshot()
+        }
     }
 
     // KeyDown handler
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        const key = e.key.toLowerCase()
+        if (key === 'enter' && !e.shiftKey) {
             e.preventDefault()
             handleSend()
         }
 
-        if (e.key === 'Backspace') {
+        if (key === 'backspace') {
             handleBackspace(e)
         }
 
-        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
-            e.preventDefault()
+        if (e.ctrlKey || e.metaKey) {
+            if (key === 'z') {
+                e.preventDefault()
+                e.stopPropagation()
+                if (e.shiftKey) {
+                    handleRedo()
+                } else {
+                    handleUndo()
+                }
+                return
+            }
+
+            if (key === 'y' && !e.shiftKey) {
+                e.preventDefault()
+                e.stopPropagation()
+                handleRedo()
+                return
+            }
         }
     }
 
@@ -1581,6 +1699,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
                 restoreAnnotationsFromSerialized(importedText)
                 checkContent()
+                captureSnapshot()
                 setTimeout(() => {
                     updateTagStatistics()
                 }, 0)
@@ -1990,9 +2109,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     // Shortcut lar
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.defaultPrevented) {
+                return
+            }
+            const key = event.key.toLowerCase()
             if (
                 event.ctrlKey &&
-                event.key === ' ' &&
+                key === ' ' &&
                 resolvedLanguageId &&
                 languageTags.length > 0
             ) {
@@ -2000,8 +2123,47 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 handleTextSelection()
             }
 
-            if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+            const shouldHandleUndoRedo = () => {
+                if (!editorRef.current) {
+                    return false
+                }
+                const activeElement = document.activeElement
+                if (
+                    activeElement === editorRef.current ||
+                    (activeElement instanceof Node &&
+                        editorRef.current.contains(activeElement))
+                ) {
+                    return true
+                }
+                const targetNode = event.target as Node | null
+                if (
+                    targetNode &&
+                    editorRef.current.contains(targetNode)
+                ) {
+                    return true
+                }
+                return false
+            }
+
+            if ((event.ctrlKey || event.metaKey) && key === 'z') {
+                if (!shouldHandleUndoRedo()) {
+                    return
+                }
                 event.preventDefault()
+                if (event.shiftKey) {
+                    handleRedo()
+                } else {
+                    handleUndo()
+                }
+                return
+            }
+
+            if ((event.ctrlKey || event.metaKey) && key === 'y') {
+                if (!shouldHandleUndoRedo()) {
+                    return
+                }
+                event.preventDefault()
+                handleRedo()
             }
         }
 
@@ -2009,7 +2171,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return () => {
             document.removeEventListener('keydown', handleKeyDown)
         }
-    }, [handleTextSelection, languageTags.length, resolvedLanguageId])
+    }, [
+        handleRedo,
+        handleTextSelection,
+        handleUndo,
+        languageTags.length,
+        resolvedLanguageId,
+    ])
 
     // Paste handler
     const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -2017,6 +2185,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         const text = e.clipboardData.getData('text/plain')
         document.execCommand('insertText', false, text)
         updateTagStatistics()
+        captureSnapshot()
     }
 
     // Drop handler
@@ -2031,6 +2200,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             document.execCommand('insertText', false, text)
         }
         updateTagStatistics()
+        captureSnapshot()
     }
 
     // Input o'zgarganda
@@ -2043,6 +2213,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 setForceCreate(true)
             }
         }
+        captureSnapshot()
     }
 
     const handleFullscreenChange = (): void => {
