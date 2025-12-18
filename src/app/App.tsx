@@ -2,13 +2,12 @@ import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/hooks/useAuth'
 import { LoginForm } from '@/features/auth/components/LoginForm'
-import { RegisterForm } from '@/features/auth/components/RegisterForm'
+// import { RegisterForm } from '@/features/auth/components/RegisterForm'
 import { MainLayout } from '@/app/layouts/MainLayout'
 
 function App() {
-    const { isAuthenticated, loading } = useAuth() // <- loading qo'shildi
+    const { isAuthenticated, loading } = useAuth()
 
-    // Loading bo'lsa, spinner ko'rsatamiz
     if (loading) {
         return (
             <div
@@ -29,7 +28,6 @@ function App() {
     return (
         <div className='App'>
             <Routes>
-                {/* Asosiy sahifa */}
                 <Route
                     path='/'
                     element={
@@ -40,8 +38,6 @@ function App() {
                         )
                     }
                 />
-
-                {/* Barcha linguistics sahifalari */}
                 <Route
                     path='/linguistics'
                     element={
@@ -52,7 +48,6 @@ function App() {
                         )
                     }
                 />
-
                 <Route
                     path='/linguistics/:id'
                     element={
@@ -63,8 +58,6 @@ function App() {
                         )
                     }
                 />
-
-                {/* Tags sahifasi */}
                 <Route
                     path='/tags'
                     element={
@@ -75,8 +68,6 @@ function App() {
                         )
                     }
                 />
-
-                {/* Editor sahifasi */}
                 <Route
                     path='/editor'
                     element={
@@ -87,8 +78,6 @@ function App() {
                         )
                     }
                 />
-
-                {/* Login sahifasi */}
                 <Route
                     path='/login'
                     element={
@@ -99,8 +88,7 @@ function App() {
                         )
                     }
                 />
-
-                {/* Register sahifasi */}
+                {/*
                 <Route
                     path='/register'
                     element={
@@ -111,15 +99,14 @@ function App() {
                         )
                     }
                 />
-
-                {/* Noto'g'ri yo'l uchun */}
+                */}
                 <Route path='*' element={<Navigate to='/' replace />} />
             </Routes>
         </div>
     )
 }
 
-// AuthPage komponenti
+// Register bo'limi keyinchalik qaytarish uchun quyida kommentda saqlanmoqda.
 const AuthPage: React.FC<{ initialTab: 'login' | 'register' }> = ({
     initialTab,
 }) => {
@@ -142,6 +129,7 @@ const AuthPage: React.FC<{ initialTab: 'login' | 'register' }> = ({
                 >
                     Login
                 </button>
+                {/*
                 <button
                     onClick={() => setIsLogin(false)}
                     style={{
@@ -155,9 +143,13 @@ const AuthPage: React.FC<{ initialTab: 'login' | 'register' }> = ({
                 >
                     Register
                 </button>
+                */}
             </div>
 
+            <LoginForm />
+            {/*
             {isLogin ? <LoginForm /> : <RegisterForm />}
+            */}
         </div>
     )
 }
