@@ -1,10 +1,4 @@
-import React, {
-    useState,
-    useRef,
-    useEffect,
-    useCallback,
-    useMemo,
-} from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import './ChatInput.css'
 import FullscreenIcon from '@mui/icons-material/Fullscreen'
 import FullscreenExitIcon from '@mui/icons-material/FullscreenExit'
@@ -26,6 +20,7 @@ import {
     TextField,
     Button,
     Typography,
+    CircularProgress,
 } from '@mui/material'
 
 const DEFAULT_ANALYSIS_TYPE = 1
@@ -53,12 +48,12 @@ interface ChatInputProps {
     availableTags?: Tag[]
     maxTagsCount?: number
     onStatisticsUpdate?: (
-        stats: Record<string, { count: number; color: string }>
+        stats: Record<string, { count: number; color: string }>,
     ) => void
     textId?: number
     onTextSaved?: (
         savedText: SavedTextPayload,
-        context: { isUpdate: boolean }
+        context: { isUpdate: boolean },
     ) => void
     tagContextMap?: Record<string, TagContextInfo>
     onImportContextDetected?: (context: {
@@ -87,6 +82,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const [menuPosition, setMenuPosition] = useState({ x: 0, y: 0 })
     const [selectedRange, setSelectedRange] = useState<Range | null>(null)
     const [hasContent, setHasContent] = useState(false)
+    const [isAiSaving, setIsAiSaving] = useState(false)
     const [notification, setNotification] = useState<{
         open: boolean
         message: string
@@ -157,12 +153,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     } = useEditor()
     const resolvedTaggedTextId = taggedTextId ?? textId
     const resolvedLanguageId = languageId ?? loadedLanguageId
-    const tagSource =
-        availableTags !== undefined ? availableTags : editorTags
+    const tagSource = availableTags !== undefined ? availableTags : editorTags
 
     const showNotification = (
         message: string,
-        severity: 'success' | 'error' = 'success'
+        severity: 'success' | 'error' = 'success',
     ) => {
         setNotification({
             open: true,
@@ -179,18 +174,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             }
             return (
                 tagSource.find(
-                    (tag) =>
-                        tag.abbreviation?.toLowerCase() ===
-                        normalized
+                    (tag) => tag.abbreviation?.toLowerCase() === normalized,
                 ) ||
                 editorTags.find(
-                    (tag) =>
-                        tag.abbreviation?.toLowerCase() ===
-                        normalized
+                    (tag) => tag.abbreviation?.toLowerCase() === normalized,
                 )
             )
         },
-        [editorTags, tagSource]
+        [editorTags, tagSource],
     )
 
     const getTagColor = useCallback(
@@ -202,7 +193,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             const tagInfo = findTagByAbbreviation(abbr)
             return tagInfo?.color || '#e3f2fd'
         },
-        [findTagByAbbreviation]
+        [findTagByAbbreviation],
     )
 
     const applyPrimaryColor = useCallback(
@@ -223,7 +214,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 element.style.backgroundColor = element.dataset.primaryColor
             }
         },
-        [getTagColor]
+        [getTagColor],
     )
 
     const ensurePrimaryColor = useCallback(
@@ -246,7 +237,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 element.style.backgroundColor = element.dataset.primaryColor
             }
         },
-        [getTagColor]
+        [getTagColor],
     )
 
     const normalizeAnnotatedElements = useCallback(() => {
@@ -295,7 +286,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                             const breakElement = createBreakElement()
                             element.parentNode?.insertBefore(
                                 breakElement,
-                                textNode
+                                textNode,
                             )
                             return
                         }
@@ -317,7 +308,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             const walker = document.createTreeWalker(
                 editorRef.current,
                 NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-                null
+                null,
             )
             walker.currentNode = element
 
@@ -373,7 +364,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 return
             }
         },
-        []
+        [],
     )
 
     useEffect(() => {
@@ -407,9 +398,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return parts
             .join('')
             .replace(/\u00a0/g, ' ')
-            .replace(/\s+/g, (match) =>
-                match === '\n' ? '\n' : match
-            )
+            .replace(/\s+/g, (match) => (match === '\n' ? '\n' : match))
     }, [])
 
     const restoreAnnotationsFromSerialized = useCallback(
@@ -425,17 +414,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 }
 
                 if (/^\s+$/.test(token)) {
-                    fragment.appendChild(
-                        document.createTextNode(token)
-                    )
+                    fragment.appendChild(document.createTextNode(token))
                     return
                 }
 
                 if (!token.includes('/')) {
                     fragment.appendChild(
-                        document.createTextNode(
-                            token.replace(/\+/g, ' ')
-                        )
+                        document.createTextNode(token.replace(/\+/g, ' ')),
                     )
                     return
                 }
@@ -446,18 +431,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
                 if (!rawWord || abbreviations.length === 0) {
                     fragment.appendChild(
-                        document.createTextNode(
-                            token.replace(/\+/g, ' ')
-                        )
+                        document.createTextNode(token.replace(/\+/g, ' ')),
                     )
                     return
                 }
 
                 const span = document.createElement('span')
                 span.className = 'annotated-text'
-                span.style.backgroundColor = getTagColor(
-                    abbreviations[0]
-                )
+                span.style.backgroundColor = getTagColor(abbreviations[0])
                 span.style.color = '#000'
                 span.style.padding = '2px 6px'
                 span.style.borderRadius = '4px'
@@ -474,9 +455,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const tagTitles = abbreviations
                     .map((abbr) => {
                         const tagInfo = findTagByAbbreviation(abbr)
-                        return tagInfo
-                            ? `${tagInfo.name_tag} (${abbr})`
-                            : abbr
+                        return tagInfo ? `${tagInfo.name_tag} (${abbr})` : abbr
                     })
                     .join(', ')
 
@@ -492,7 +471,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             editorRef.current.appendChild(fragment)
             normalizeRef.current?.()
         },
-        [applyPrimaryColor, findTagByAbbreviation, getTagColor]
+        [applyPrimaryColor, findTagByAbbreviation, getTagColor],
     )
 
     const restoreRef = useRef(restoreAnnotationsFromSerialized)
@@ -505,8 +484,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         const annotatedElements =
             editorRef.current.querySelectorAll('.annotated-text')
-        const newStats: Record<string, { count: number; color: string }> =
-            {}
+        const newStats: Record<string, { count: number; color: string }> = {}
 
         annotatedElements.forEach((element) => {
             const currentText = element.textContent || ''
@@ -519,15 +497,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         const existingColor =
                             latestStatsRef.current[tagAbbr]?.color
                         const tagInfo =
-                            tagSource.find(
-                                (t) => t.abbreviation === tagAbbr
-                            ) || findTagByAbbreviation(tagAbbr)
+                            tagSource.find((t) => t.abbreviation === tagAbbr) ||
+                            findTagByAbbreviation(tagAbbr)
                         newStats[tagAbbr] = {
                             count: 0,
-                            color:
-                                existingColor ||
-                                tagInfo?.color ||
-                                '#e3f2fd',
+                            color: existingColor || tagInfo?.color || '#e3f2fd',
                         }
                     }
                     newStats[tagAbbr].count++
@@ -597,7 +571,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 isRestoringHistoryRef.current = false
             })
         },
-        [checkContent, focusEditorAtEnd, updateTagStatistics]
+        [checkContent, focusEditorAtEnd, updateTagStatistics],
     )
 
     const handleUndo = useCallback(() => {
@@ -629,7 +603,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
     const getReplaceOccurrences = useCallback(
         (
-            term: string
+            term: string,
         ): Array<{ node: Text; start: number; length: number }> => {
             if (!editorRef.current) {
                 return []
@@ -641,7 +615,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             const walker = document.createTreeWalker(
                 editorRef.current,
-                NodeFilter.SHOW_TEXT
+                NodeFilter.SHOW_TEXT,
             )
             const occurrences: Array<{
                 node: Text
@@ -671,12 +645,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             return occurrences
         },
-        []
+        [],
     )
 
     const updateReplaceStats = useCallback(
         (
-            term: string
+            term: string,
         ): {
             matches: Array<{ node: Text; start: number; length: number }>
             activeIndex: number
@@ -715,12 +689,12 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     const startsInside =
                         range.compareBoundaryPoints(
                             Range.START_TO_START,
-                            matchRange
+                            matchRange,
                         ) >= 0
                     const endsInside =
                         range.compareBoundaryPoints(
                             Range.END_TO_END,
-                            matchRange
+                            matchRange,
                         ) <= 0
 
                     if (startsInside && endsInside) {
@@ -739,7 +713,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             })
             return { matches, activeIndex }
         },
-        [getReplaceOccurrences]
+        [getReplaceOccurrences],
     )
 
     const clearReplaceHighlights = useCallback(() => {
@@ -761,54 +735,49 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         replaceHighlightsRef.current = []
     }, [])
 
-    const applyReplaceHighlights = useCallback(
-        (term: string) => {
-            if (!editorRef.current) {
-                return
-            }
-            const searchValue = term
-            if (!searchValue.length) {
-                return
-            }
-            const walker = document.createTreeWalker(
-                editorRef.current,
-                NodeFilter.SHOW_TEXT
-            )
-            let currentNode = walker.nextNode()
-            let matchCounter = 0
-            while (currentNode) {
-                const textNode = currentNode as Text
-                const text = textNode.textContent || ''
-                if (text.includes(searchValue)) {
-                    const parts = text.split(searchValue)
-                    if (parts.length > 1) {
-                        const fragment = document.createDocumentFragment()
-                        parts.forEach((part, index) => {
-                            if (part.length) {
-                                fragment.appendChild(
-                                    document.createTextNode(part)
-                                )
-                            }
-                            if (index < parts.length - 1) {
-                                const highlight = document.createElement('span')
-                                highlight.className = 'replace-highlight'
-                                highlight.textContent = searchValue
-                                matchCounter += 1
-                                highlight.dataset.replaceIndex =
-                                    matchCounter.toString()
-                                fragment.appendChild(highlight)
-                                replaceHighlightsRef.current.push(highlight)
-                            }
-                        })
-                        const parent = textNode.parentNode
-                        parent?.replaceChild(fragment, textNode)
-                    }
+    const applyReplaceHighlights = useCallback((term: string) => {
+        if (!editorRef.current) {
+            return
+        }
+        const searchValue = term
+        if (!searchValue.length) {
+            return
+        }
+        const walker = document.createTreeWalker(
+            editorRef.current,
+            NodeFilter.SHOW_TEXT,
+        )
+        let currentNode = walker.nextNode()
+        let matchCounter = 0
+        while (currentNode) {
+            const textNode = currentNode as Text
+            const text = textNode.textContent || ''
+            if (text.includes(searchValue)) {
+                const parts = text.split(searchValue)
+                if (parts.length > 1) {
+                    const fragment = document.createDocumentFragment()
+                    parts.forEach((part, index) => {
+                        if (part.length) {
+                            fragment.appendChild(document.createTextNode(part))
+                        }
+                        if (index < parts.length - 1) {
+                            const highlight = document.createElement('span')
+                            highlight.className = 'replace-highlight'
+                            highlight.textContent = searchValue
+                            matchCounter += 1
+                            highlight.dataset.replaceIndex =
+                                matchCounter.toString()
+                            fragment.appendChild(highlight)
+                            replaceHighlightsRef.current.push(highlight)
+                        }
+                    })
+                    const parent = textNode.parentNode
+                    parent?.replaceChild(fragment, textNode)
                 }
-                currentNode = walker.nextNode()
             }
-        },
-        []
-    )
+            currentNode = walker.nextNode()
+        }
+    }, [])
 
     const setActiveReplaceHighlight = useCallback((index: number) => {
         replaceHighlightsRef.current.forEach((highlight) => {
@@ -832,7 +801,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             const walker = document.createTreeWalker(
                 editorRef.current,
-                NodeFilter.SHOW_TEXT
+                NodeFilter.SHOW_TEXT,
             )
             let currentNode = walker.nextNode()
             const pendingUpdates: Array<{ node: Text; text: string }> = []
@@ -858,7 +827,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             return total
         },
-        []
+        [],
     )
 
     const convertTaggedTokensToAnnotations = useCallback(() => {
@@ -868,7 +837,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         const walker = document.createTreeWalker(
             editorRef.current,
-            NodeFilter.SHOW_TEXT
+            NodeFilter.SHOW_TEXT,
         )
 
         let currentNode = walker.nextNode()
@@ -950,9 +919,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const title = abbreviations
                     .map((abbr) => {
                         const info = findTagByAbbreviation(abbr)
-                        return info
-                            ? `${info.name_tag} (${abbr})`
-                            : abbr
+                        return info ? `${info.name_tag} (${abbr})` : abbr
                     })
                     .join(', ')
                 span.title = title
@@ -1003,23 +970,20 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     const handleReplaceAll = useCallback(() => {
         const search = replaceSearchTerm.trim()
         if (!search.length) {
-            showNotification('Qidirish uchun so\'z kiriting', 'error')
+            showNotification("Qidirish uchun so'z kiriting", 'error')
             return
         }
         clearReplaceHighlights()
         const replacements = replaceAllOccurrences(search, replaceValue)
         if (!replacements) {
-            showNotification('Mos keladigan so\'z topilmadi', 'error')
+            showNotification("Mos keladigan so'z topilmadi", 'error')
             return
         }
         convertTaggedTokensToAnnotations()
         checkContent()
         updateTagStatistics()
         captureSnapshot()
-        showNotification(
-            `${replacements} ta o'zgarish bajarildi`,
-            'success'
-        )
+        showNotification(`${replacements} ta o'zgarish bajarildi`, 'success')
         setIsReplaceModalOpen(false)
     }, [
         captureSnapshot,
@@ -1044,7 +1008,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const existingTags = parts.length > 1 ? parts.slice(1) : []
 
                 if (existingTags.includes(abbr)) {
-                    showNotification('Bu teg allaqachon qo\'yilgan', 'error')
+                    showNotification("Bu teg allaqachon qo'yilgan", 'error')
                     return prev
                 }
 
@@ -1067,7 +1031,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 return `${trimmed}/${abbr}`
             })
         },
-        [normalizedMaxTagsCount, showNotification]
+        [normalizedMaxTagsCount, showNotification],
     )
 
     useEffect(() => {
@@ -1128,7 +1092,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         : {
                               ...prev,
                               currentIndex: numericIndex,
-                          }
+                          },
                 )
                 setActiveReplaceHighlight(numericIndex)
             }
@@ -1138,7 +1102,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return () => {
             document.removeEventListener(
                 'selectionchange',
-                handleSelectionChange
+                handleSelectionChange,
             )
         }
     }, [isReplaceModalOpen, setActiveReplaceHighlight])
@@ -1148,10 +1112,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             return
         }
         setActiveReplaceHighlight(replaceStats.currentIndex)
-    }, [isReplaceModalOpen, replaceStats.currentIndex, setActiveReplaceHighlight])
+    }, [
+        isReplaceModalOpen,
+        replaceStats.currentIndex,
+        setActiveReplaceHighlight,
+    ])
 
     const parseMetadata = (
-        metadata: unknown
+        metadata: unknown,
     ): Record<string, unknown> | null => {
         if (!metadata) {
             return null
@@ -1186,9 +1154,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     const getAnnotatedHtml = (metadata: unknown): string => {
-        const parsedMetadata = parseMetadata(metadata) as
-            | { annotated_html?: unknown }
-            | null
+        const parsedMetadata = parseMetadata(metadata) as {
+            annotated_html?: unknown
+        } | null
 
         if (
             parsedMetadata &&
@@ -1200,7 +1168,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     const getStoredTagStatistics = (
-        metadata: unknown
+        metadata: unknown,
     ): Record<string, { count: number; color: string }> | null => {
         const parsedMetadata = parseMetadata(metadata)
         if (!parsedMetadata) {
@@ -1226,7 +1194,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     value &&
                     typeof value === 'object' &&
                     'count' in (value as Record<string, unknown>) &&
-                    'color' in (value as Record<string, unknown>)
+                    'color' in (value as Record<string, unknown>),
             )
         ) {
             return parsedMetadata as Record<
@@ -1283,7 +1251,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
             return null
         },
-        [tagContextMap]
+        [tagContextMap],
     )
 
     const getTagLimitError = useCallback((): string | null => {
@@ -1321,7 +1289,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         if (editorRef.current) {
             const walker = document.createTreeWalker(
                 editorRef.current,
-                NodeFilter.SHOW_ELEMENT
+                NodeFilter.SHOW_ELEMENT,
             )
             let currentNode: Node | null = walker.currentNode
             while ((currentNode = walker.nextNode())) {
@@ -1375,7 +1343,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                                 Authorization: `Bearer ${authToken}`,
                                 Accept: 'application/json',
                             },
-                        }
+                        },
                     )
 
                     if (response.ok) {
@@ -1384,7 +1352,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         setLoadedLanguageId(textData.language)
 
                         const storedStats = getStoredTagStatistics(
-                            textData.metadata
+                            textData.metadata,
                         )
                         if (storedStats) {
                             latestStatsRef.current = storedStats
@@ -1395,7 +1363,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         }
 
                         const annotatedHtml = getAnnotatedHtml(
-                            textData.metadata
+                            textData.metadata,
                         )
 
                         if (annotatedHtml && editorRef.current) {
@@ -1407,8 +1375,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         ) {
                             restoreRef.current?.(textData.text)
                         } else if (editorRef.current) {
-                            editorRef.current.textContent =
-                                textData.text || ''
+                            editorRef.current.textContent = textData.text || ''
                         }
 
                         checkContent()
@@ -1417,10 +1384,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                             updateTagStatistics()
                         }, 0)
 
-                        console.log(
-                            'Text loaded successfully:',
-                            textData.title
-                        )
+                        console.log('Text loaded successfully:', textData.title)
                     } else {
                         throw new Error('Failed to load text')
                     }
@@ -1466,10 +1430,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         }
 
         const languageMatches =
-            (languageId &&
-                languageId === pendingImportSave.languageId) ||
-            (!languageId &&
-                resolvedLanguageId === pendingImportSave.languageId)
+            (languageId && languageId === pendingImportSave.languageId) ||
+            (!languageId && resolvedLanguageId === pendingImportSave.languageId)
         const analysisMatches =
             analysisType === pendingImportSave.analysisTypeId
 
@@ -1540,9 +1502,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         if (!resolvedLanguageId) {
             return []
         }
-        return tagSource.filter(
-            (tag) => tag.language.id === resolvedLanguageId
-        )
+        return tagSource.filter((tag) => tag.language.id === resolvedLanguageId)
     }, [resolvedLanguageId, tagSource])
 
     // Teglarni filterlash
@@ -1557,7 +1517,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return languageTags.filter(
             (tag) =>
                 tag.name_tag?.toLowerCase().includes(searchValue) ||
-                tag.abbreviation?.toLowerCase().includes(searchValue)
+                tag.abbreviation?.toLowerCase().includes(searchValue),
         )
     }, [languageTags, searchTerm])
 
@@ -1662,7 +1622,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         const textNode = document.createTextNode(textWithSpaces)
         selectedAnnotatedElement.parentNode?.replaceChild(
             textNode,
-            selectedAnnotatedElement
+            selectedAnnotatedElement,
         )
 
         const newRange = document.createRange()
@@ -1766,11 +1726,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     // MouseUp handler
     const handleMouseUp = useCallback(
         (e: React.MouseEvent) => {
-            if (e.button === 2 && resolvedLanguageId && languageTags.length > 0) {
+            if (
+                e.button === 2 &&
+                resolvedLanguageId &&
+                languageTags.length > 0
+            ) {
                 // Right-click handling
             }
         },
-        [languageTags.length, resolvedLanguageId]
+        [languageTags.length, resolvedLanguageId],
     )
 
     // Teg tanlanganida
@@ -1791,8 +1755,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             const existingTags = existingText.split('/').slice(1)
             if (existingTags.includes(normalizedAbbr)) {
                 showNotification(
-                    'Bu so\'zga bu teg allaqachon qo\'yilgan',
-                    'error'
+                    "Bu so'zga bu teg allaqachon qo'yilgan",
+                    'error',
                 )
                 return
             }
@@ -1818,11 +1782,11 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                             if (lastChild.nodeType === Node.TEXT_NODE) {
                                 range.setStart(
                                     lastChild,
-                                    lastChild.textContent?.length || 0
+                                    lastChild.textContent?.length || 0,
                                 )
                                 range.setEnd(
                                     lastChild,
-                                    lastChild.textContent?.length || 0
+                                    lastChild.textContent?.length || 0,
                                 )
                             } else {
                                 range.setStartAfter(lastChild)
@@ -1870,7 +1834,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             if (
                 targetElement.nodeType === Node.TEXT_NODE &&
                 targetElement.parentElement?.classList.contains(
-                    'annotated-text'
+                    'annotated-text',
                 )
             ) {
                 targetElement = targetElement.parentElement
@@ -1887,8 +1851,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const parts = currentText.split('/')
                 const originalText = parts[0]
                 const normalizedOriginal = originalText.replace(/\+/g, ' ')
-                const originalEndsWithPeriod =
-                    normalizedOriginal.trim().endsWith('.')
+                const originalEndsWithPeriod = normalizedOriginal
+                    .trim()
+                    .endsWith('.')
                 const currentTags = parts.slice(1)
                 const normalizedAbbr = (tag.abbreviation || '').trim()
                 if (
@@ -1896,8 +1861,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     currentTags.includes(normalizedAbbr)
                 ) {
                     showNotification(
-                        'Bu so\'zga bu teg allaqachon qo\'yilgan',
-                        'error'
+                        "Bu so'zga bu teg allaqachon qo'yilgan",
+                        'error',
                     )
                     resolve()
                     return
@@ -1940,7 +1905,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
                 insertAutoBreakAfterSentence(
                     existingElement,
-                    originalEndsWithPeriod
+                    originalEndsWithPeriod,
                 )
             } else {
                 const span = document.createElement('span')
@@ -2031,7 +1996,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             if (
                 previousSibling &&
                 (previousSibling as HTMLElement).classList?.contains(
-                    'annotated-text'
+                    'annotated-text',
                 )
             ) {
                 targetElement = previousSibling as HTMLElement
@@ -2065,7 +2030,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const originalText = parts[0]
                 const remainingTags = parts.slice(1, -1)
                 const newFormattedText = `${originalText}/${remainingTags.join(
-                    '/'
+                    '/',
                 )}`
                 targetElement.textContent = newFormattedText
 
@@ -2150,7 +2115,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     }
 
     const handleFileInputChange = (
-        event: React.ChangeEvent<HTMLInputElement>
+        event: React.ChangeEvent<HTMLInputElement>,
     ) => {
         const file = event.target.files?.[0]
         setShowImportExport(false)
@@ -2160,7 +2125,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         const fileName = file.name.toLowerCase()
         if (!fileName.endsWith('.txt')) {
-            showNotification('Faqat .txt fayllarni import qilish mumkin', 'error')
+            showNotification(
+                'Faqat .txt fayllarni import qilish mumkin',
+                'error',
+            )
             event.target.value = ''
             return
         }
@@ -2171,15 +2139,17 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 const content = reader.result?.toString() || ''
                 const trimmedContent = content.trim()
                 if (!trimmedContent.length) {
-                    throw new Error('Fayl bo\'sh')
+                    throw new Error("Fayl bo'sh")
                 }
 
                 const looksLikeJson =
                     trimmedContent.startsWith('{') &&
                     trimmedContent.endsWith('}')
                 let importedText = ''
-                let statsPayload: Record<string, { count: number; color: string }> =
-                    {}
+                let statsPayload: Record<
+                    string,
+                    { count: number; color: string }
+                > = {}
                 let nextLanguage: number | undefined
                 let nextAnalysisType: number | null = null
                 let parsed: unknown = null
@@ -2231,9 +2201,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 }
 
                 let derivedLanguageId =
-                    typeof nextLanguage === 'number'
-                        ? nextLanguage
-                        : undefined
+                    typeof nextLanguage === 'number' ? nextLanguage : undefined
                 let derivedAnalysisTypeId =
                     typeof nextAnalysisType === 'number'
                         ? nextAnalysisType
@@ -2260,10 +2228,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     setLoadedLanguageId(derivedLanguageId)
                 }
 
-                if (
-                    derivedAnalysisTypeId &&
-                    derivedAnalysisTypeId > 0
-                ) {
+                if (derivedAnalysisTypeId && derivedAnalysisTypeId > 0) {
                     setImportedAnalysisType(derivedAnalysisTypeId)
                 } else {
                     setImportedAnalysisType(null)
@@ -2312,8 +2277,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 showNotification(
                     error instanceof Error
                         ? error.message
-                        : 'Faylni import qilib bo\'lmadi',
-                    'error'
+                        : "Faylni import qilib bo'lmadi",
+                    'error',
                 )
             } finally {
                 event.target.value = ''
@@ -2322,7 +2287,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
         reader.onerror = () => {
             console.error('Failed to read file')
-            showNotification('Faylni o\'qib bo\'lmadi', 'error')
+            showNotification("Faylni o'qib bo'lmadi", 'error')
             event.target.value = ''
         }
 
@@ -2332,7 +2297,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     // Export funksiyasi
     const handleExport = () => {
         if (!editorRef.current || !editorRef.current.innerText.trim()) {
-            showNotification('Eksport qilish uchun matn yo\'q', 'error')
+            showNotification("Eksport qilish uchun matn yo'q", 'error')
             setShowImportExport(false)
             return
         }
@@ -2348,15 +2313,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         const derivedTitle = plainText.slice(0, 50) || 'Tegs'
         const fileTitle =
             derivedTitle.length > 20 ? 'Tegs' : derivedTitle || 'Tegs'
-        const sanitizedName = fileTitle
-            .replace(/[<>:"/\\|?*]/g, '')
-            .trim()
+        const sanitizedName = fileTitle.replace(/[<>:"/\\|?*]/g, '').trim()
         const fileName =
             sanitizedName.length > 0
                 ? sanitizedName
                 : derivedTitle.length > 20
-                ? 'Tegs'
-                : 'annotation'
+                  ? 'Tegs'
+                  : 'annotation'
 
         const blob = new Blob([serializedText], {
             type: 'text/plain;charset=utf-8',
@@ -2383,14 +2346,14 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         try {
             const savedText = await sendToBackend(
                 editorRef.current.innerHTML,
-                isUpdate
+                isUpdate,
             )
             if (savedText) {
                 showNotification(
                     isUpdate
                         ? 'Text successfully updated!'
                         : 'Text successfully saved!',
-                    'success'
+                    'success',
                 )
                 onSendMessage(editorRef.current.innerHTML)
                 onTextSaved(savedText, { isUpdate })
@@ -2408,15 +2371,15 @@ export const ChatInput: React.FC<ChatInputProps> = ({
     // Backend ga yuborish funksiyasi
     const sendToBackend = async (
         htmlContent: string,
-        isUpdate: boolean
+        isUpdate: boolean,
     ): Promise<SavedTextPayload | null> => {
         try {
             const effectiveAnalysisType =
                 importedAnalysisType && importedAnalysisType > 0
                     ? importedAnalysisType
                     : analysisType && analysisType > 0
-                    ? analysisType
-                    : DEFAULT_ANALYSIS_TYPE
+                      ? analysisType
+                      : DEFAULT_ANALYSIS_TYPE
             const finalLanguageId = resolvedLanguageId
 
             // Auth token ni tekshirish
@@ -2424,7 +2387,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             if (!authToken) {
                 showNotification(
                     'Authentication required. Please login.',
-                    'error'
+                    'error',
                 )
                 return null
             }
@@ -2434,7 +2397,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             if (!userId) {
                 showNotification(
                     'User information not found. Please login again.',
-                    'error'
+                    'error',
                 )
                 return null
             }
@@ -2511,7 +2474,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                         Authorization: `Bearer ${authToken}`,
                     },
                     body: JSON.stringify(requestData),
-                }
+                },
             )
 
             // Response ni tekshirish
@@ -2736,10 +2699,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                     return true
                 }
                 const targetNode = event.target as Node | null
-                if (
-                    targetNode &&
-                    editorRef.current.contains(targetNode)
-                ) {
+                if (targetNode && editorRef.current.contains(targetNode)) {
                     return true
                 }
                 return false
@@ -2838,7 +2798,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         return () => {
             document.removeEventListener(
                 'fullscreenchange',
-                handleFullscreenChange
+                handleFullscreenChange,
             )
         }
     }, [])
@@ -2883,6 +2843,136 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                 index: index,
             }
         })
+    }
+
+    // AI bilan saqlash funksiyasi
+    const handleSaveWithAI = async (): Promise<void> => {
+        if (!editorRef.current?.innerHTML.trim() || isAiSaving) return
+
+        setIsAiSaving(true)
+
+        try {
+            // Auth token va user ID ni olamiz
+            const authToken = getAuthToken()
+            if (!authToken) {
+                showNotification(
+                    'Authentication required. Please login.',
+                    'error',
+                )
+                setIsAiSaving(false)
+                return
+            }
+
+            const userId = getUserId()
+            if (!userId) {
+                showNotification(
+                    'User information not found. Please login again.',
+                    'error',
+                )
+                setIsAiSaving(false)
+                return
+            }
+
+            // Language ID tekshirish
+            if (!resolvedLanguageId) {
+                showNotification('Please select a language first.', 'error')
+                setIsAiSaving(false)
+                return
+            }
+
+            // Textni olish
+            const serializedText = serializeEditorContent()
+            if (!serializedText.trim()) {
+                showNotification('Text cannot be empty.', 'error')
+                setIsAiSaving(false)
+                return
+            }
+
+            // Analysis type
+            const effectiveAnalysisType =
+                analysisType && analysisType > 0
+                    ? analysisType
+                    : DEFAULT_ANALYSIS_TYPE
+
+            // Metadata
+            const metadataPayload =
+                Object.keys(latestStatsRef.current).length > 0
+                    ? latestStatsRef.current
+                    : {}
+
+            // Request body
+            const requestData = {
+                analysis_type: effectiveAnalysisType,
+                user: userId,
+                language: resolvedLanguageId,
+                text: serializedText,
+                metadata: JSON.stringify(metadataPayload),
+            }
+
+            console.log('Sending AI request:', requestData)
+
+            // API so'rovi
+            const response = await fetch(
+                `${import.meta.env.VITE_API_BASE_URL}/tagged_texts/with_ai/`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        Authorization: `Bearer ${authToken}`,
+                    },
+                    body: JSON.stringify(requestData),
+                },
+            )
+
+            if (response.ok) {
+                const result = await response.json()
+                console.log('AI processing successful:', result)
+
+                // Agar result ichida yangi annotated text bo'lsa, uni editorga yuklaymiz
+                if (result.annotated_text) {
+                    restoreAnnotationsFromSerialized(result.annotated_text)
+                    showNotification(
+                        'Text successfully processed with AI!',
+                        'success',
+                    )
+                } else if (result.text) {
+                    restoreAnnotationsFromSerialized(result.text)
+                    showNotification(
+                        'Text successfully processed with AI!',
+                        'success',
+                    )
+                } else {
+                    showNotification('AI processing completed', 'success')
+                }
+
+                // Statistics yangilash
+                setTimeout(() => {
+                    updateTagStatistics()
+                }, 100)
+            } else {
+                const errorText = await response.text()
+                console.error('AI processing error:', errorText)
+
+                let errorMessage = 'Failed to process with AI'
+                try {
+                    const errorJson = JSON.parse(errorText)
+                    errorMessage =
+                        errorJson.detail || errorJson.message || errorMessage
+                } catch {
+                    if (errorText) {
+                        errorMessage = errorText
+                    }
+                }
+
+                showNotification(errorMessage, 'error')
+            }
+        } catch (error) {
+            console.error('Network error during AI processing:', error)
+            showNotification('Network error during AI processing', 'error')
+        } finally {
+            setIsAiSaving(false)
+        }
     }
 
     return (
@@ -3300,6 +3390,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
 
                 <div className='chat-input-actions'>
                     <div className='left-actions'>
+                        <Button
+                            variant='contained'
+                            color='success'
+                            onClick={handleSaveWithAI}
+                            disabled={!hasContent || isAiSaving}
+                            startIcon={
+                                isAiSaving ? (
+                                    <CircularProgress size={20} />
+                                ) : null
+                            }
+                            sx={{ mr: 1 }}
+                        >
+                            {isAiSaving ? 'AI Processing...' : 'With AI'}
+                        </Button>
+
                         <button
                             className='save-button'
                             onClick={handleSend}
@@ -3402,9 +3507,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                                     variant='outlined'
                                     ref={replaceTagButtonRef}
                                     onClick={() =>
-                                        setShowReplaceTagPicker(
-                                            (prev) => !prev
-                                        )
+                                        setShowReplaceTagPicker((prev) => !prev)
                                     }
                                     disabled={!languageTags.length}
                                 >
